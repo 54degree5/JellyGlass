@@ -2,10 +2,10 @@
 # Wraps the release build of the demo into build/JellyGlassDemo.app (ad-hoc signed).
 set -euo pipefail
 cd "$(dirname "$0")/.."
-swift build -c release
+swift build -c release --arch arm64 --arch x86_64      # universal: Apple silicon + Intel
 APP=build/JellyGlassDemo.app
 rm -rf "$APP"; mkdir -p "$APP/Contents/MacOS"
-cp .build/release/JellyGlassDemo "$APP/Contents/MacOS/JellyGlassDemo"
+cp .build/apple/Products/Release/JellyGlassDemo "$APP/Contents/MacOS/JellyGlassDemo"
 cat > "$APP/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -22,3 +22,4 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 PLIST
 codesign --force --sign - "$APP" >/dev/null 2>&1
 echo "built $APP"
+ditto -c -k --keepParent "$APP" build/JellyGlassDemo.zip && echo "zipped build/JellyGlassDemo.zip"

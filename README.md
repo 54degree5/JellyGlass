@@ -42,7 +42,10 @@ The numbers are not guessed: they were measured, frame by frame, from a screen r
 
 **In the browser** (any modern browser, no install): <https://54degree5.github.io/JellyGlass/>
 
-**On your Mac** (macOS 26+, Xcode 26 / Swift 6.2+):
+**Download the demo app** (macOS 26+, Apple silicon and Intel): [latest release](https://github.com/54degree5/JellyGlass/releases/latest).
+It is ad-hoc signed, not notarized: unzip, then right-click → Open (or `xattr -dr com.apple.quarantine JellyGlassDemo.app`).
+
+**Or build it** (macOS 26+, Xcode 26 / Swift 6.2+):
 
 ```bash
 git clone https://github.com/54degree5/JellyGlass.git
