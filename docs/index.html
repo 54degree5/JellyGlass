@@ -46,6 +46,10 @@
     background-size: 22px 22px, 44px 44px; background-position: 0 0, 0 0; }
 
   /* ---------- stage ---------- */
+  #gl { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; display: none; }
+  html.gl #gl { display: block; }
+  html.gl #bg, html.gl .jb-glass { display: none; }           /* the canvas draws the scene and the glass itself */
+  #stage, #title, #hint, #controls { z-index: 2; }
   #stage { position: fixed; left: 50%; top: 46%; width: 520px; height: 330px;
     transform: translate(-50%, -50%) scale(var(--ui)); transform-origin: 50% 50%; touch-action: none; }
   .row { position: absolute; display: flex; gap: var(--gap); align-items: center; }
@@ -121,6 +125,7 @@
 </style>
 </head>
 <body>
+<canvas id="gl" aria-hidden="true"></canvas>
 <div id="bg"><div class="blob"></div><div class="blob"></div><div class="blob"></div><div class="blob"></div><div class="blob"></div><div id="grid"></div></div>
 
 <div id="title">JellyGlass <a href="https://github.com/54degree5/JellyGlass">GitHub</a>
@@ -282,6 +287,145 @@
   }
 
   const jellies = [...document.querySelectorAll('.jb')].map(el => new Jelly(el));
+
+  /* ------------------------------------------------------------------------------------------------
+     Real Liquid Glass. The scene behind the buttons (colour blobs + grid) is a function, so one WebGL2 fragment
+     shader draws it and, inside each button's capsule, draws it again *through* the glass: the sample point is bent
+     by the slope of a rounded glass edge (refraction), split per colour channel (dispersion), slightly magnified,
+     lightly blurred, then lit with a fresnel rim and a specular glint. Works in every browser with WebGL2; without it
+     the CSS glass above stays. Each capsule follows its button's jelly motion every frame.
+  ------------------------------------------------------------------------------------------------ */
+  (() => {
+    const canvas = document.getElementById('gl');
+    const gl = canvas.getContext('webgl2', { antialias: false, alpha: false, powerPreference: 'high-performance' });
+    if (!gl) return;
+    const VERT = `#version 300 es
+      in vec2 a; void main() { gl_Position = vec4(a, 0.0, 1.0); }`;
+    const FRAG = `#version 300 es
+      precision highp float;
+      uniform vec2 uRes; uniform float uDpr, uTime; uniform vec4 uBox[5]; uniform float uPress[5], uHeld[5]; uniform int uCount;
+      out vec4 outColor;
+
+      // ---- the scene: gradient, five drifting colour blobs, a faint grid --------------------------------------------
+      vec3 scene(vec2 p) {
+        vec2 uv = p / uRes;
+        float g = clamp((uv.x + (1.0 - uv.y)) * 0.5, 0.0, 1.0);
+        vec3 col = g < 0.52 ? mix(vec3(.05,.06,.20), vec3(.28,.08,.38), g / 0.52)
+                            : mix(vec3(.28,.08,.38), vec3(.04,.22,.34), (g - .52) / .48);
+        float vm = max(uRes.x, uRes.y) / 100.0;
+        for (int i = 0; i < 5; i++) {
+          vec2 c; vec3 bc; float per;
+          if (i == 0)      { c = vec2(15., 17.) * vm;                    bc = vec3(1.00,.35,.45); per = 18.; }
+          else if (i == 1) { c = vec2(uRes.x - 13. * vm, 27. * vm);      bc = vec3(.20,.80,1.0);  per = 23.; }
+          else if (i == 2) { c = vec2(49. * vm, uRes.y - 7. * vm);       bc = vec3(1.0,.80,.20);  per = 29.; }
+          else if (i == 3) { c = vec2(uRes.x - 33. * vm, uRes.y - 3. * vm); bc = vec3(.55,.40,1.0); per = 21.; }
+          else             { c = vec2(9. * vm, uRes.y - 13. * vm);       bc = vec3(.20,1.0,.60);  per = 26.; }
+          float s = 0.5 - 0.5 * cos(6.2831853 * uTime / (2.0 * per));
+          c += s * vec2(18., -9.) * vm;
+          float w = clamp(1.0 - length(p - c) / (21.5 * vm * (1.0 + .12 * s)), 0.0, 1.0);
+          col = mix(col, bc, w * .95);
+        }
+        vec2 m = mod(p, vec2(44., 22.));
+        float lx = 1.0 - smoothstep(.75, 1.75, m.x), ly = 1.0 - smoothstep(.75, 1.75, m.y);
+        return mix(col, vec3(1.0), .13 * max(lx, ly));
+      }
+
+      // ---- one capsule (a rounded box whose radius is its short half-side) ----------------------------------------
+      float sd(vec2 p, vec4 b) {
+        vec2 h = b.zw; float r = min(h.x, h.y);
+        vec2 q = abs(p - b.xy) - (h - r);
+        return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
+      }
+
+      vec3 blurScene(vec2 p, float r) {
+        return (scene(p) * 2.0 + scene(p + vec2(r, 0.)) + scene(p - vec2(r, 0.)) + scene(p + vec2(0., r)) + scene(p - vec2(0., r))) / 6.0;
+      }
+
+      void main() {
+        vec2 p = vec2(gl_FragCoord.x, uRes.y * uDpr - gl_FragCoord.y) / uDpr;      // css px, y down
+        vec3 col = scene(p);
+
+        // soft shadows under every glass first, so a glass sitting on another one throws a shadow on it
+        for (int i = 0; i < 5; i++) {
+          if (i >= uCount) break;
+          float lift = uHeld[i];
+          float ds = sd(p - vec2(0., 8. + 6. * lift), uBox[i]);
+          col *= 1.0 - (.20 + .08 * lift) * exp(-max(ds, 0.0) / (13. + 6. * lift));
+        }
+
+        for (int i = 0; i < 5; i++) {
+          if (i >= uCount) break;
+          vec4 b = uBox[i];
+          float d = sd(p, b);
+          if (d > 1.0) continue;
+          float cover = clamp(0.5 - d, 0.0, 1.0);
+          float din = max(-d, 0.0);
+          float bezel = min(b.z, b.w) * 0.55;                      // how thick the curved edge is
+          float t = clamp(din / bezel, 0.0, 1.0);
+          float edge = pow(1.0 - t, 2.2);                          // 1 at the rim, 0 in the flat middle
+
+          vec2 e = vec2(1.0, 0.0);
+          vec2 n = normalize(vec2(sd(p + e.xy, b) - sd(p - e.xy, b), sd(p + e.yx, b) - sd(p - e.yx, b)) + 1e-5);   // outward
+          float push = 12.5 * edge;                                // px of bend at the rim
+          vec2 mag = (p - b.xy) * 0.04 * (1.0 - edge);             // gentle magnification of the middle
+          vec2 sp = p - mag - n * push;                            // sample from further inside: a convex lens
+
+          vec3 refr;
+          refr.r = blurScene(p - mag - n * push * 1.10, 1.1).r;
+          refr.g = blurScene(sp, 1.1).g;
+          refr.b = blurScene(p - mag - n * push * 0.90, 1.1).b;
+
+          vec2 L = normalize(vec2(-.62, -.78));                    // light from the top left
+          float lit = max(dot(n, L), 0.0), back = max(dot(n, -L), 0.0);
+          float rim = pow(1.0 - t, 3.0);
+          float spec = (pow(lit, 2.2) * .34 + pow(back, 2.2) * .14) * rim;
+          float fres = pow(1.0 - t, 4.0) * .10;
+          float press = uPress[i];
+
+          vec3 g = refr * (1.04 + .05 * (1.0 - edge));
+          g = mix(g, vec3(1.0), .025 + .10 * press);               // faint milkiness, lighter when pressed
+          g += vec3(spec + fres);
+          g -= vec3(.05) * smoothstep(.0, 1.0, (p.y - b.y) / b.w) * (1.0 - edge); // a hint of depth toward the bottom
+          col = mix(col, g, cover);
+        }
+        outColor = vec4(col, 1.0);
+      }`;
+    const compile = (type, src) => { const sh = gl.createShader(type); gl.shaderSource(sh, src); gl.compileShader(sh);
+      if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) { console.warn(gl.getShaderInfoLog(sh)); return null; } return sh; };
+    const vs = compile(gl.VERTEX_SHADER, VERT), fs = compile(gl.FRAGMENT_SHADER, FRAG);
+    if (!vs || !fs) return;
+    const prog = gl.createProgram(); gl.attachShader(prog, vs); gl.attachShader(prog, fs); gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) { console.warn(gl.getProgramInfoLog(prog)); return; }
+    gl.useProgram(prog);
+    const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+    const loc = gl.getAttribLocation(prog, 'a'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+    const U = n => gl.getUniformLocation(prog, n);
+    const uRes = U('uRes'), uDpr = U('uDpr'), uTime = U('uTime'), uBox = U('uBox[0]'), uPress = U('uPress[0]'), uHeld = U('uHeld[0]'), uCount = U('uCount');
+    document.documentElement.classList.add('gl');
+
+    let dpr = 1;
+    const resize = () => { dpr = Math.min(devicePixelRatio || 1, 2); canvas.width = Math.round(innerWidth * dpr); canvas.height = Math.round(innerHeight * dpr);
+      gl.viewport(0, 0, canvas.width, canvas.height); };
+    addEventListener('resize', resize); resize();
+
+    const boxes = new Float32Array(20), press = new Float32Array(5), held = new Float32Array(5);
+    const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    function frame(now) {
+      const ui = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ui')) || 1;
+      const items = jellies.map(j => { const r = j.el.getBoundingClientRect(), m = j.shape;
+        return { held: j.dragging ? 1 : 0, cx: r.left + r.width / 2 + m.ox * ui, cy: r.top + r.height / 2 + m.oy * ui,
+                 hx: r.width / 2 * m.sx, hy: r.height / 2 * m.sy, p: j.pressLevel }; });
+      items.sort((a, b) => a.held - b.held);                    // the one being held is drawn last, on top
+      items.forEach((it, i) => { boxes.set([it.cx, it.cy, it.hx, it.hy], i * 4); press[i] = it.p; held[i] = it.held; });
+      gl.uniform2f(uRes, innerWidth, innerHeight); gl.uniform1f(uDpr, dpr); gl.uniform1f(uTime, still ? 0 : now / 1000);
+      gl.uniform4fv(uBox, boxes); gl.uniform1fv(uPress, press); gl.uniform1fv(uHeld, held); gl.uniform1i(uCount, items.length);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+  })();
+
 
   // ---------- controls ----------
   function segment(host, key, options) {

@@ -124,11 +124,17 @@ Full write-up with the layer tree and the dead ends: [docs/HOW_IT_WORKS.md](docs
 ## Web version
 
 [`docs/index.html`](docs/index.html) is a single file, no dependencies. Open it and, after a moment, a cursor starts
-pressing the buttons and wandering with them (press anything to take over; **▶ demo** brings it back). It is a 1:1 port of the physics (same
-formulas, same springs) on top of `backdrop-filter` glass. What carries over exactly: axis-aligned stretch,
-unbounded logarithmic growth, diagonal growth, press swell, tint, jelly and icon springs, on-top lift.
-What is approximate: the glass itself — CSS has no Liquid Glass material, so it is blur + saturation + rim light,
-and there is no container-level merging. Contributions that add SVG refraction or a gooey merge are welcome.
+pressing the buttons and wandering with them (press anything to take over; **▶ demo** brings it back).
+
+The glass is real, not a CSS imitation: a WebGL2 fragment shader draws the scene behind the buttons and draws it again
+*through* each button's capsule — the sample point is bent by the slope of a rounded glass edge (refraction), split per
+colour channel (dispersion), slightly magnified in the middle, lightly blurred, then lit with a fresnel rim and a faint
+specular glint. Each capsule follows its button's jelly motion every frame, so the refraction stretches and wobbles with
+it (120 fps on a retina MacBook). The physics is the same as the AppKit version: same formulas, same springs.
+
+Two honest limits: the glass refracts **its own scene** (a shader cannot see the DOM, so it works because the background
+is drawn by the same shader), and without WebGL2 the page falls back to a frosted CSS glass. Making it refract arbitrary
+page content needs a page capture or Chromium's SVG `backdrop-filter`; contributions welcome.
 
 ## Caveats
 
@@ -143,7 +149,7 @@ and there is no container-level merging. Contributions that add SVG refraction o
 
 ## Roadmap
 
-- [ ] SVG refraction for the web demo
+- [ ] Refraction of arbitrary page content on the web
 - [ ] Gooey merge for the web demo
 - [ ] SwiftUI wrapper (`JellyGlass { … }`)
 - [ ] Haptics and sound hooks
