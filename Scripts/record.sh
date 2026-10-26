@@ -16,6 +16,6 @@ sleep 0.4
 kill $PID 2>/dev/null || true
 
 ffmpeg -v error -y -i docs/media/showreel.mov -c:v libx264 -pix_fmt yuv420p -crf 20 -movflags +faststart docs/media/showreel.mp4
-ffmpeg -v error -y -i docs/media/showreel.mov -vf "fps=24,scale=800:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=192:stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle" docs/media/showreel.gif
+ffmpeg -v error -y -i docs/media/showreel.mov -vf "fps=22,scale=760:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=256:stats_mode=full[p];[b][p]paletteuse=dither=bayer:bayer_scale=3:diff_mode=rectangle" docs/media/showreel.gif
 rm -f docs/media/showreel.mov
 ls -la docs/media

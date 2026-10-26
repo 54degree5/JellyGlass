@@ -9,12 +9,9 @@ and wobble back — plus a dependency-free web version you can try in a browser.
 
 [![Live demo](https://img.shields.io/badge/live%20demo-try%20it-8c66ff?style=for-the-badge)](https://54degree5.github.io/JellyGlass/) ![macOS 26+](https://img.shields.io/badge/macOS-26%2B-111?style=for-the-badge&logo=apple) ![Swift 6](https://img.shields.io/badge/Swift-6-f05138?style=for-the-badge&logo=swift&logoColor=white) ![MIT](https://img.shields.io/badge/license-MIT-2ea44f?style=for-the-badge)
 
-<img src="docs/media/showreel.gif" alt="A mouse cursor presses glass buttons and wanders with them: they swell, stretch along the pull, lift over their neighbours and wobble back" width="800">
+<a href="docs/media/showreel.mp4"><img src="docs/media/showreel.gif" alt="A mouse cursor presses glass buttons and wanders with them: they swell, stretch along the pull, lift over their neighbours and wobble back" width="760"></a>
 
-<a href="https://github.com/54degree5/JellyGlass/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/54degree5/JellyGlass?style=for-the-badge&logo=github&color=8c66ff"></a>
-<a href="https://github.com/54degree5/JellyGlass/forks"><img alt="Forks" src="https://img.shields.io/github/forks/54degree5/JellyGlass?style=for-the-badge&logo=github&color=555"></a>
-<a href="https://github.com/54degree5/JellyGlass/commits/main"><img alt="Last commit" src="https://img.shields.io/github/last-commit/54degree5/JellyGlass?style=for-the-badge&color=2ea44f"></a>
-<a href="https://github.com/54degree5/JellyGlass/issues"><img alt="Open issues" src="https://img.shields.io/github/issues/54degree5/JellyGlass?style=for-the-badge&color=ffb84d"></a>
+<a href="https://github.com/54degree5/JellyGlass/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/54degree5/JellyGlass?style=for-the-badge&logo=github&color=8c66ff"></a> <a href="https://github.com/54degree5/JellyGlass/forks"><img alt="Forks" src="https://img.shields.io/github/forks/54degree5/JellyGlass?style=for-the-badge&logo=github&color=555"></a> <a href="https://github.com/54degree5/JellyGlass/commits/main"><img alt="Last commit" src="https://img.shields.io/github/last-commit/54degree5/JellyGlass?style=for-the-badge&color=2ea44f"></a> <a href="https://github.com/54degree5/JellyGlass/issues"><img alt="Open issues" src="https://img.shields.io/github/issues/54degree5/JellyGlass?style=for-the-badge&color=ffb84d"></a>
 
 **If this made you smile, a ⭐ helps others find it.**
 
