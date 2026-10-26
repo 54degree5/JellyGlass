@@ -138,6 +138,11 @@ colour channel (dispersion), slightly magnified in the middle, lightly blurred, 
 specular glint. Each capsule follows its button's jelly motion every frame, so the refraction stretches and wobbles with
 it (120 fps on a retina MacBook). The physics is the same as the AppKit version: same formulas, same springs.
 
+**Any shape, any length:** [`docs/shapes.html`](https://54degree5.github.io/JellyGlass/shapes.html) runs the same physics on a circle, a
+pill, a 560 px bar, a squircle, a star, a heart, a hexagon, a triangle, a plus sign and a wobbly blob. A shape is just a
+signed-distance function in the shader; refraction, rim and shadow come from its gradient, so any closed shape works.
+In AppKit the private `_setPath:` takes any `CGPath`.
+
 Two honest limits: the glass refracts **its own scene** (a shader cannot see the DOM, so it works because the background
 is drawn by the same shader), and without WebGL2 the page falls back to a frosted CSS glass. Making it refract arbitrary
 page content needs a page capture or Chromium's SVG `backdrop-filter`; contributions welcome.
