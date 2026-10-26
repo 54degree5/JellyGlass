@@ -7,10 +7,7 @@
 AppKit buttons for macOS 26 that swell when pressed, follow your drag, stretch along the pull,\
 and wobble back — plus a dependency-free web version you can try in a browser.
 
-[![Live demo](https://img.shields.io/badge/live%20demo-try%20it-8c66ff?style=for-the-badge)](https://54degree5.github.io/JellyGlass/)
-![macOS 26+](https://img.shields.io/badge/macOS-26%2B-111?style=for-the-badge&logo=apple)
-![Swift 6](https://img.shields.io/badge/Swift-6-f05138?style=for-the-badge&logo=swift&logoColor=white)
-![MIT](https://img.shields.io/badge/license-MIT-2ea44f?style=for-the-badge)
+[![Live demo](https://img.shields.io/badge/live%20demo-try%20it-8c66ff?style=for-the-badge)](https://54degree5.github.io/JellyGlass/) ![macOS 26+](https://img.shields.io/badge/macOS-26%2B-111?style=for-the-badge&logo=apple) ![Swift 6](https://img.shields.io/badge/Swift-6-f05138?style=for-the-badge&logo=swift&logoColor=white) ![MIT](https://img.shields.io/badge/license-MIT-2ea44f?style=for-the-badge)
 
 <img src="docs/media/showreel.gif" alt="Glass buttons stretching, lifting over neighbours and wobbling back" width="720">
 
@@ -85,6 +82,9 @@ With `d` the cursor's distance in points from where the button was pressed:
 |---|---|---|
 | body travel `t(d)` | `6.5 · ln(1 + d / 28)` | 5.6 / 8.8 / 13.2 / 22 pt |
 | stretch `e(d)` | `0.105 · ln(1 + d / 50) · d² / (d² + 40²)` | 0.03 / 0.08 / 0.16 / 0.30 |
+
+Beyond ~200 pt the recorded body travel plateaus (it contains a single long flick), but by hand the app keeps stretching,
+so the model deliberately keeps growing — slowly, without a ceiling (see the shaded area below).
 
 Pulled along an axis the shape scales `×(1+e)` along it and `÷(1+e)` across it. Pulled diagonally the
 axial part fades out and the whole button grows `1 + 0.6·e` instead. Springs (stiffness / damping):
