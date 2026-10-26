@@ -20,6 +20,7 @@ final class RootView: NSView {
     let stripes = StripesView()
     let bar = InputBar(frame: NSRect(x: 0, y: 0, width: 440, height: 240), lift: true)
     let header = HeaderBar(frame: NSRect(x: 0, y: 0, width: 300, height: 200), lift: true)
+    let cursor = CursorOverlay(frame: .zero)
 
     override var acceptsFirstResponder: Bool { true }
 
@@ -29,6 +30,7 @@ final class RootView: NSView {
         addSubview(stripes)
         addSubview(header)
         addSubview(bar)
+        addSubview(cursor)
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -37,6 +39,7 @@ final class RootView: NSView {
         super.layout()
         backdrop.frame = bounds
         stripes.frame = bounds
+        cursor.frame = bounds
         // Everything the demo shows sits in one compact cluster: the header pair above the input row, right-aligned.
         let barCenterY = bounds.height * 0.42
         bar.frame.origin = CGPoint(x: bounds.midX - bar.frame.width / 2, y: barCenterY - bar.frame.height / 2)
@@ -115,24 +118,41 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             root.layoutSubtreeIfNeeded()
             var union = CGRect.null
             for button in root.allButtons { union = union.union(button.convert(button.bounds, to: nil)) }
-            let stage = window.convertToScreen(union.insetBy(dx: -70, dy: -60))
+            // room around the buttons for the cursor to wander; stay inside the window
+            let area = union.insetBy(dx: -150, dy: -120).intersection(root.convert(root.bounds, to: nil))
+            let stage = window.convertToScreen(area)
             let y = screen.frame.maxY - stage.maxY
             try? "\(Int(stage.minX)) \(Int(y)) \(Int(stage.width)) \(Int(stage.height))\n".write(toFile: path, atomically: true, encoding: .utf8)
         }
 
         if args.contains("--showreel") {
-            let reel = Showreel(gestures: [
-                .init(button: bar.mic, vector: CGVector(dx: -150, dy: 0), ramp: 0.45, hold: 0.9),
-                .init(button: bar.mic, vector: CGVector(dx: 0, dy: 170), ramp: 0.45, hold: 0.7),
-                .init(button: header.pin, vector: CGVector(dx: 130, dy: 0), ramp: 0.45, hold: 0.8),
-                .init(button: header.pill, vector: CGVector(dx: -120, dy: -80), ramp: 0.5, hold: 0.8),
-                .init(button: bar.attach, vector: CGVector(dx: 90, dy: 100), ramp: 0.5, hold: 0.8),
-                .init(button: bar.mic, vector: CGVector(dx: -320, dy: 40), ramp: 0.6, hold: 0.9),
-            ])
+            root.layoutSubtreeIfNeeded()
+            func center(_ b: JellyGlassButton) -> CGPoint {
+                root.convert(CGPoint(x: b.bounds.midX, y: b.bounds.midY), from: b)
+            }
+            func v(_ x: CGFloat, _ y: CGFloat) -> CGVector { CGVector(dx: x, dy: y) }
+            let takes: [Showreel.Take] = [
+                // slow S-curve to the left over the pill, then a lazy drift back
+                .init(button: bar.mic, waypoints: [v(-45, 10), v(-120, -14), v(-185, 20), v(-135, 48), v(-60, 24)], duration: 2.6, swing: 0.5),
+                // a quick flick up and a loop in the air, wandering over the header
+                .init(button: bar.mic, waypoints: [v(10, 60), v(70, 150), v(130, 110), v(60, 55), v(-45, 125), v(-20, 60)], duration: 2.3, swing: 0.8),
+                // short horizontal sweep over the search pill, back and forth
+                .init(button: header.pin, waypoints: [v(60, 6), v(140, -8), v(90, 14), v(165, 4), v(70, -6)], duration: 2.1, swing: 0.7),
+                // diagonal figure-of-eight below the search pill
+                .init(button: header.pill, waypoints: [v(-50, -35), v(-110, -95), v(-30, -140), v(55, -85), v(105, -30), v(30, 10)], duration: 2.7, swing: 0.6),
+                // long sweep right, across the whole input row
+                .init(button: bar.attach, waypoints: [v(80, -22), v(180, 28), v(280, -6), v(210, 70), v(110, 38), v(30, -10)], duration: 2.6, swing: 0.6),
+                // big loop around the pill, fast then slow
+                .init(button: bar.pill, waypoints: [v(-110, 46), v(-175, -12), v(-95, -70), v(55, -42), v(150, 24), v(90, 82), v(-20, 38)], duration: 3.0, swing: 0.85),
+                // quick horizontal shake on the mic, the way you rattle a slider
+                .init(button: bar.mic, waypoints: [v(-80, 0), v(55, 6), v(-120, -4), v(40, 8), v(-60, 0), v(10, 0)], duration: 1.6, swing: 0.4),
+            ]
+            let reel = Showreel(takes: takes, overlay: root.cursor,
+                                startAt: CGPoint(x: root.bounds.midX - 40, y: center(bar.mic).y - 150), anchorOf: center)
             showreel = reel
             reel.start()
             if let path = value("--duration-file") {
-                try? "\(reel.duration + 0.8)\n".write(toFile: path, atomically: true, encoding: .utf8)
+                try? "\(reel.duration + 0.6)\n".write(toFile: path, atomically: true, encoding: .utf8)
             }
         }
 

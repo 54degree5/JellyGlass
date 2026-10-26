@@ -9,7 +9,14 @@ and wobble back — plus a dependency-free web version you can try in a browser.
 
 [![Live demo](https://img.shields.io/badge/live%20demo-try%20it-8c66ff?style=for-the-badge)](https://54degree5.github.io/JellyGlass/) ![macOS 26+](https://img.shields.io/badge/macOS-26%2B-111?style=for-the-badge&logo=apple) ![Swift 6](https://img.shields.io/badge/Swift-6-f05138?style=for-the-badge&logo=swift&logoColor=white) ![MIT](https://img.shields.io/badge/license-MIT-2ea44f?style=for-the-badge)
 
-<img src="docs/media/showreel.gif" alt="Glass buttons stretching, lifting over neighbours and wobbling back" width="720">
+<img src="docs/media/showreel.gif" alt="A mouse cursor presses glass buttons and wanders with them: they swell, stretch along the pull, lift over their neighbours and wobble back" width="800">
+
+<a href="https://github.com/54degree5/JellyGlass/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/54degree5/JellyGlass?style=for-the-badge&logo=github&color=8c66ff"></a>
+<a href="https://github.com/54degree5/JellyGlass/forks"><img alt="Forks" src="https://img.shields.io/github/forks/54degree5/JellyGlass?style=for-the-badge&logo=github&color=555"></a>
+<a href="https://github.com/54degree5/JellyGlass/commits/main"><img alt="Last commit" src="https://img.shields.io/github/last-commit/54degree5/JellyGlass?style=for-the-badge&color=2ea44f"></a>
+<a href="https://github.com/54degree5/JellyGlass/issues"><img alt="Open issues" src="https://img.shields.io/github/issues/54degree5/JellyGlass?style=for-the-badge&color=ffb84d"></a>
+
+**If this made you smile, a ⭐ helps others find it.**
 
 </div>
 
@@ -116,7 +123,8 @@ Full write-up with the layer tree and the dead ends: [docs/HOW_IT_WORKS.md](docs
 
 ## Web version
 
-[`docs/index.html`](docs/index.html) is a single file, no dependencies. It is a 1:1 port of the physics (same
+[`docs/index.html`](docs/index.html) is a single file, no dependencies. Open it and, after a moment, a cursor starts
+pressing the buttons and wandering with them (press anything to take over; **▶ demo** brings it back). It is a 1:1 port of the physics (same
 formulas, same springs) on top of `backdrop-filter` glass. What carries over exactly: axis-aligned stretch,
 unbounded logarithmic growth, diagonal growth, press swell, tint, jelly and icon springs, on-top lift.
 What is approximate: the glass itself — CSS has no Liquid Glass material, so it is blur + saturation + rim light,
@@ -145,6 +153,20 @@ and there is no container-level merging. Contributions that add SVG refraction o
 
 Issues and PRs welcome — especially measurements from other apps (record the screen, drop the file in an
 issue), and anything that makes the AppKit side less private-API-dependent.
+
+## Star history
+
+<a href="https://star-history.com/#54degree5/JellyGlass&Date">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=54degree5/JellyGlass&type=Date&theme=dark">
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=54degree5/JellyGlass&type=Date">
+    <img alt="Star history chart" src="https://api.star-history.com/svg?repos=54degree5/JellyGlass&type=Date" width="720">
+  </picture>
+</a>
+
+## Contributors
+
+<a href="https://github.com/54degree5/JellyGlass/graphs/contributors"><img alt="Contributors" src="https://contrib.rocks/image?repo=54degree5/JellyGlass"></a>
 
 ## License
 

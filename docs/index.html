@@ -76,6 +76,17 @@
     -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); box-shadow: inset 0 0 0 1px rgba(255,255,255,.18); }
   .seg button { all: unset; cursor: pointer; padding: 6px 13px; border-radius: 999px; color: rgba(255,255,255,.65); }
   .seg button[aria-pressed="true"] { background: rgba(255,255,255,.22); color: #fff; box-shadow: inset 0 0 0 1px rgba(255,255,255,.25); }
+  #title #stars { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 999px; background: rgba(255,255,255,.12);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.2); opacity: .9; margin-left: 12px; }
+  #title #stars[hidden] { display: none; }
+  #cursor { position: fixed; left: 0; top: 0; width: 0; height: 0; z-index: 100; pointer-events: none; display: none; }
+  #cursor svg { position: absolute; left: -1px; top: -1px; filter: drop-shadow(0 2px 2px rgba(0,0,0,.45)); transform-origin: 2px 2px; transition: transform .08s; }
+  #cursor.down svg { transform: scale(.86); }
+  #cursor i { position: absolute; left: -20px; top: -20px; width: 40px; height: 40px; border-radius: 50%; border: 1.5px solid rgba(255,255,255,.85);
+    background: rgba(255,255,255,.26); opacity: 0; }
+  #cursor i.ping { animation: ping .5s ease-out; }
+  @keyframes ping { from { transform: scale(.35); opacity: .9; } to { transform: scale(1.7); opacity: 0; } }
+  .seg button.demo { display: inline-flex; align-items: center; gap: 6px; }
   #hint { position: fixed; left: 0; right: 0; top: 48px; text-align: center; opacity: .55; pointer-events: none; transition: opacity .6s; }
   @media (prefers-reduced-motion: reduce) { .blob { animation: none; } }
 </style>
@@ -83,7 +94,9 @@
 <body>
 <div id="bg"><div class="blob"></div><div class="blob"></div><div class="blob"></div><div class="blob"></div><div class="blob"></div><div id="grid"></div></div>
 
-<div id="title">JellyGlass <a href="https://github.com/54degree5/JellyGlass">GitHub</a></div>
+<div id="title">JellyGlass <a href="https://github.com/54degree5/JellyGlass">GitHub</a>
+  <a id="stars" href="https://github.com/54degree5/JellyGlass/stargazers" hidden><svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path fill="currentColor" d="M8 .6l2.2 4.7 5.1.7-3.7 3.6.9 5.1L8 12.2 3.5 14.7l.9-5.1L.7 6l5.1-.7z"/></svg> <span></span></a></div>
+<div id="cursor" aria-hidden="true"><i></i><svg viewBox="0 0 17 23" width="22" height="30"><path d="M1.5 1v17l4.6-4.1 3.1 7.2 3-1.3-3-7.1h6.1z" fill="#000" stroke="#fff" stroke-width="1.4" stroke-linejoin="round"/></svg></div>
 <div id="hint">drag a button</div>
 
 <div id="stage">
@@ -103,6 +116,7 @@
 <div id="controls">
   <div class="seg" id="seg-spring" role="group" aria-label="spring"></div>
   <div class="seg" id="seg-stretch" role="group" aria-label="stretch"></div>
+  <div class="seg" role="group" aria-label="demo"><button class="demo" id="demo" aria-pressed="false">▶ demo</button></div>
 </div>
 
 <script>
@@ -178,11 +192,15 @@
       if (this.dragging) return;
       e.preventDefault();
       this.el.setPointerCapture(e.pointerId);
-      this.start = { x: e.clientX, y: e.clientY };
-      this.dragging = true; this.el.classList.add('held');
-      this.setPull(0, 0); wake(this);
+      this.begin(e.clientX, e.clientY);
       document.getElementById('hint').style.opacity = 0;
     }
+    begin(x, y) {                                      // press at client (x, y); also used by the autoplay
+      this.start = { x, y };
+      this.dragging = true; this.el.classList.add('held');
+      this.setPull(0, 0); wake(this);
+    }
+    dragTo(x, y) { if (this.dragging) { this.setPull(x - this.start.x, y - this.start.y); wake(this); } }
     move(e) { if (this.dragging) { this.setPull(e.clientX - this.start.x, e.clientY - this.start.y); wake(this); } }
     up() {
       if (!this.dragging) return;
@@ -247,6 +265,93 @@
   }
   segment(document.getElementById('seg-spring'), 'spring', Object.keys(SPRINGS));
   segment(document.getElementById('seg-stretch'), 'stretch', Object.keys(STRETCH));
+
+  // ---------- autoplay: a visible cursor presses the buttons and wanders with them ----------
+  // Same choreography as the native showreel (Showreel.swift). Offsets are stage points, y up, like the native demo.
+  const V = (x, y) => ({ x, y });
+  const TAKES = [   // [button index: 0 pin, 1 search, 2 clip, 3 gift, 4 mic], waypoints, seconds, swing
+    [4, [V(-45,10), V(-120,-14), V(-185,20), V(-135,48), V(-60,24)], 2.6, .5],
+    [4, [V(10,60), V(70,150), V(130,110), V(60,55), V(-45,125), V(-20,60)], 2.3, .8],
+    [0, [V(60,6), V(140,-8), V(90,14), V(165,4), V(70,-6)], 2.1, .7],
+    [1, [V(-50,-35), V(-110,-95), V(-30,-140), V(55,-85), V(105,-30), V(30,10)], 2.7, .6],
+    [2, [V(80,-22), V(180,28), V(280,-6), V(210,70), V(110,38), V(30,-10)], 2.6, .6],
+    [3, [V(-110,46), V(-175,-12), V(-95,-70), V(55,-42), V(150,24), V(90,82), V(-20,38)], 3.0, .85],
+    [4, [V(-80,0), V(55,6), V(-120,-4), V(40,8), V(-60,0), V(10,0)], 1.6, .4],
+  ];
+  const cursorEl = document.getElementById('cursor'), pingEl = cursorEl.querySelector('i'), demoBtn = document.getElementById('demo');
+  const smooth = x => x * x * (3 - 2 * x);
+  const warp = (x, a) => x + Math.min(a, .9) * Math.sin(4 * Math.PI * x) / (4 * Math.PI);
+  function catmull(p, u) {                                          // Catmull-Rom spline through p, u in 0..1
+    const n = p.length - 1, f = Math.min(Math.max(u, 0), 1) * n, i = Math.min(Math.floor(f), n - 1), t = f - i;
+    const a = p[Math.max(i - 1, 0)], b = p[i], c = p[i + 1], d = p[Math.min(i + 2, n)];
+    const ax = (a, b, c, d) => .5 * (2 * b + (-a + c) * t + (2 * a - 5 * b + 4 * c - d) * t * t + (-a + 3 * b - 3 * c + d) * t * t * t);
+    return { x: ax(a.x, b.x, c.x, d.x), y: ax(a.y, b.y, c.y, d.y) };
+  }
+
+  const auto = { on: false, raf: 0, t0: 0, segs: [], held: null, idle: 0 };
+  function buildSegments() {
+    const ui = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ui')) || 1;
+    const centre = j => { const r = j.el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; };
+    let t = 0.4, cur = { x: innerWidth * .5, y: innerHeight * .72 }; const segs = [];
+    TAKES.forEach(([idx, pts, dur, swing], n) => {
+      const j = jellies[idx], a = centre(j), dist = Math.hypot(a.x - cur.x, a.y - cur.y) / ui;
+      const trav = Math.min(Math.max(.34 + dist / 700, .4), .95);
+      segs.push({ t0: t, t1: t + trav, kind: 'travel', from: cur, to: a, bend: n % 2 ? -.18 : .18 }); t += trav;
+      segs.push({ t0: t, t1: t + dur, kind: 'drag', j, a, pts: [V(0, 0), ...pts], swing, ui }); t += dur;
+      const last = pts[pts.length - 1]; cur = { x: a.x + last.x * ui, y: a.y - last.y * ui };
+    });
+    segs.push({ t0: t, t1: t + 1.1, kind: 'idle' });
+    return segs;
+  }
+  function releaseHeld() { if (auto.held) { auto.held.up(); auto.held = null; } cursorEl.classList.remove('down'); }
+  function place(x, y) { cursorEl.style.transform = `translate(${x}px, ${y}px)`; }
+  function autoTick(now) {
+    if (!auto.on) return;
+    const t = (now - auto.t0) / 1000, segs = auto.segs, end = segs[segs.length - 1].t1;
+    if (t > end) { releaseHeld(); auto.t0 = now; auto.segs = buildSegments(); auto.raf = requestAnimationFrame(autoTick); return; }
+    let s = segs[0]; for (const x of segs) if (x.t0 <= t) s = x;
+    const k = Math.min(Math.max((t - s.t0) / (s.t1 - s.t0), 0), 1);
+    if (s.kind === 'travel') {
+      releaseHeld();
+      const u = smooth(k), mx = (s.from.x + s.to.x) / 2, my = (s.from.y + s.to.y) / 2, dx = s.to.x - s.from.x, dy = s.to.y - s.from.y;
+      const cx = mx - dy * s.bend, cy = my + dx * s.bend, a = (1 - u) * (1 - u), b = 2 * (1 - u) * u, c = u * u;
+      place(a * s.from.x + b * cx + c * s.to.x, a * s.from.y + b * cy + c * s.to.y);
+    } else if (s.kind === 'drag') {
+      if (auto.held !== s.j) {
+        releaseHeld(); auto.held = s.j; s.j.begin(s.a.x, s.a.y); cursorEl.classList.add('down');
+        pingEl.style.left = pingEl.style.top = ''; pingEl.classList.remove('ping'); void pingEl.offsetWidth; pingEl.classList.add('ping');
+      }
+      const o = catmull(s.pts, warp(k, s.swing)), x = s.a.x + o.x * s.ui, y = s.a.y - o.y * s.ui;
+      place(x, y); s.j.dragTo(x, y);
+    } else releaseHeld();
+    auto.raf = requestAnimationFrame(autoTick);
+  }
+  function startAuto() {
+    if (auto.on) return;
+    auto.on = true; cursorEl.style.display = 'block'; demoBtn.setAttribute('aria-pressed', 'true'); demoBtn.textContent = '■ stop';
+    auto.segs = buildSegments(); auto.t0 = performance.now(); auto.raf = requestAnimationFrame(autoTick);
+  }
+  function stopAuto() {
+    if (!auto.on) return;
+    auto.on = false; cancelAnimationFrame(auto.raf); releaseHeld(); cursorEl.style.display = 'none';
+    demoBtn.setAttribute('aria-pressed', 'false'); demoBtn.textContent = '▶ demo';
+  }
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let idleTimer = 0;
+  const armIdle = ms => { clearTimeout(idleTimer); if (!reduced) idleTimer = setTimeout(startAuto, ms); };
+  demoBtn.onclick = () => { clearTimeout(idleTimer); auto.on ? (stopAuto(), armIdle(15000)) : startAuto(); };
+  // a real touch, click or key stops the show at once; it resumes after a while without input
+  for (const type of ['pointerdown', 'keydown']) addEventListener(type, e => {
+    if (!e.isTrusted || e.target === demoBtn) return;
+    stopAuto(); armIdle(12000);
+  }, true);
+  armIdle(2400);
+
+  // ---------- live star count (the repository must be public; hidden otherwise) ----------
+  fetch('https://api.github.com/repos/54degree5/JellyGlass', { headers: { Accept: 'application/vnd.github+json' } })
+    .then(r => r.ok ? r.json() : Promise.reject())
+    .then(d => { const el = document.getElementById('stars'); el.querySelector('span').textContent = d.stargazers_count.toLocaleString('en'); el.hidden = false; })
+    .catch(() => {});
 
   // ---------- fit the stage on narrow screens ----------
   function fit() {
