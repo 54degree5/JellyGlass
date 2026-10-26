@@ -287,6 +287,7 @@
   }
 
   const jellies = [...document.querySelectorAll('.jb')].map(el => new Jelly(el));
+  window.__jellies = jellies;                       // handle for tests and screenshots
 
   /* ------------------------------------------------------------------------------------------------
      Real Liquid Glass. The scene behind the buttons (colour blobs + grid) is a function, so one WebGL2 fragment
@@ -303,7 +304,7 @@
       in vec2 a; void main() { gl_Position = vec4(a, 0.0, 1.0); }`;
     const FRAG = `#version 300 es
       precision highp float;
-      uniform vec2 uRes; uniform float uDpr, uTime; uniform vec4 uBox[5]; uniform float uPress[5], uHeld[5]; uniform int uCount;
+      uniform vec2 uRes; uniform float uDpr, uTime; uniform vec4 uBox[5]; uniform vec2 uScale[5]; uniform float uPress[5], uHeld[5]; uniform int uCount;
       out vec4 outColor;
 
       // ---- the scene: gradient, five drifting colour blobs, a faint grid --------------------------------------------
@@ -330,12 +331,19 @@
         return mix(col, vec3(1.0), .13 * max(lx, ly));
       }
 
-      // ---- one capsule (a rounded box whose radius is its short half-side) ----------------------------------------
-      float sd(vec2 p, vec4 b) {
+      // ---- one button: the resting capsule, scaled per axis like the native version (circles become ellipses, ends of a
+      //      pill become elliptical – never a different shape). Distance and outward normal come back in screen px. ------
+      void shape(vec2 p, vec4 b, vec2 s, out float d, out vec2 n) {
+        vec2 q = (p - b.xy) / s;                                   // into the button's own, unscaled space
         vec2 h = b.zw; float r = min(h.x, h.y);
-        vec2 q = abs(p - b.xy) - (h - r);
-        return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
+        vec2 a = abs(q) - (h - r), am = max(a, 0.0), sg = sign(q);
+        float dl = length(am) + min(max(a.x, a.y), 0.0) - r;
+        vec2 g = length(am) > 0.0 ? sg * normalize(am) : (a.x > a.y ? vec2(sg.x, 0.0) : vec2(0.0, sg.y));
+        vec2 gp = g / s;                                           // gradients transform with the inverse scale
+        float gl = max(length(gp), 1e-4);
+        d = dl / gl; n = gp / gl;
       }
+      float sdist(vec2 p, vec4 b, vec2 s) { float d; vec2 n; shape(p, b, s, d, n); return d; }
 
       vec3 blurScene(vec2 p, float r) {
         return (scene(p) * 2.0 + scene(p + vec2(r, 0.)) + scene(p - vec2(r, 0.)) + scene(p + vec2(0., r)) + scene(p - vec2(0., r))) / 6.0;
@@ -349,23 +357,21 @@
         for (int i = 0; i < 5; i++) {
           if (i >= uCount) break;
           float lift = uHeld[i];
-          float ds = sd(p - vec2(0., 8. + 6. * lift), uBox[i]);
+          float ds = sdist(p - vec2(0., 8. + 6. * lift), uBox[i], uScale[i]);
           col *= 1.0 - (.20 + .08 * lift) * exp(-max(ds, 0.0) / (13. + 6. * lift));
         }
 
         for (int i = 0; i < 5; i++) {
           if (i >= uCount) break;
-          vec4 b = uBox[i];
-          float d = sd(p, b);
+          vec4 b = uBox[i]; vec2 sc = uScale[i];
+          float d; vec2 n; shape(p, b, sc, d, n);                  // n points outward
           if (d > 1.0) continue;
           float cover = clamp(0.5 - d, 0.0, 1.0);
           float din = max(-d, 0.0);
-          float bezel = min(b.z, b.w) * 0.55;                      // how thick the curved edge is
+          float bezel = min(b.z * sc.x, b.w * sc.y) * 0.55;        // how thick the curved edge is
           float t = clamp(din / bezel, 0.0, 1.0);
           float edge = pow(1.0 - t, 2.2);                          // 1 at the rim, 0 in the flat middle
 
-          vec2 e = vec2(1.0, 0.0);
-          vec2 n = normalize(vec2(sd(p + e.xy, b) - sd(p - e.xy, b), sd(p + e.yx, b) - sd(p - e.yx, b)) + 1e-5);   // outward
           float push = 12.5 * edge;                                // px of bend at the rim
           vec2 mag = (p - b.xy) * 0.04 * (1.0 - edge);             // gentle magnification of the middle
           vec2 sp = p - mag - n * push;                            // sample from further inside: a convex lens
@@ -385,7 +391,7 @@
           vec3 g = refr * (1.04 + .05 * (1.0 - edge));
           g = mix(g, vec3(1.0), .025 + .10 * press);               // faint milkiness, lighter when pressed
           g += vec3(spec + fres);
-          g -= vec3(.05) * smoothstep(.0, 1.0, (p.y - b.y) / b.w) * (1.0 - edge); // a hint of depth toward the bottom
+          g -= vec3(.05) * smoothstep(.0, 1.0, (p.y - b.y) / (b.w * sc.y)) * (1.0 - edge); // a hint of depth toward the bottom
           col = mix(col, g, cover);
         }
         outColor = vec4(col, 1.0);
@@ -401,7 +407,7 @@
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
     const loc = gl.getAttribLocation(prog, 'a'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
     const U = n => gl.getUniformLocation(prog, n);
-    const uRes = U('uRes'), uDpr = U('uDpr'), uTime = U('uTime'), uBox = U('uBox[0]'), uPress = U('uPress[0]'), uHeld = U('uHeld[0]'), uCount = U('uCount');
+    const uRes = U('uRes'), uDpr = U('uDpr'), uTime = U('uTime'), uBox = U('uBox[0]'), uScale = U('uScale[0]'), uPress = U('uPress[0]'), uHeld = U('uHeld[0]'), uCount = U('uCount');
     document.documentElement.classList.add('gl');
 
     let dpr = 1;
@@ -409,18 +415,19 @@
       gl.viewport(0, 0, canvas.width, canvas.height); };
     addEventListener('resize', resize); resize();
 
-    const boxes = new Float32Array(20), press = new Float32Array(5), held = new Float32Array(5);
+    const boxes = new Float32Array(20), scales = new Float32Array(10), press = new Float32Array(5), held = new Float32Array(5);
     const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
     function frame(now) {
       const ui = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ui')) || 1;
       const items = jellies.map(j => { const r = j.el.getBoundingClientRect(), m = j.shape;
         return { held: j.dragging ? 1 : 0, cx: r.left + r.width / 2 + m.ox * ui, cy: r.top + r.height / 2 + m.oy * ui,
-                 hx: r.width / 2 * m.sx, hy: r.height / 2 * m.sy, p: j.pressLevel }; });
+                 hx: r.width / 2, hy: r.height / 2, sx: m.sx, sy: m.sy, p: j.pressLevel }; });
       items.sort((a, b) => a.held - b.held);                    // the one being held is drawn last, on top
-      items.forEach((it, i) => { boxes.set([it.cx, it.cy, it.hx, it.hy], i * 4); press[i] = it.p; held[i] = it.held; });
+      items.forEach((it, i) => { boxes.set([it.cx, it.cy, it.hx, it.hy], i * 4); scales.set([it.sx, it.sy], i * 2); press[i] = it.p; held[i] = it.held; });
       gl.uniform2f(uRes, innerWidth, innerHeight); gl.uniform1f(uDpr, dpr); gl.uniform1f(uTime, still ? 0 : now / 1000);
-      gl.uniform4fv(uBox, boxes); gl.uniform1fv(uPress, press); gl.uniform1fv(uHeld, held); gl.uniform1i(uCount, items.length);
+      gl.uniform4fv(uBox, boxes); gl.uniform2fv(uScale, scales); gl.uniform1fv(uPress, press); gl.uniform1fv(uHeld, held); gl.uniform1i(uCount, items.length);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
+      if (window.__afterFrame) window.__afterFrame(canvas, dpr);       // test hook
       requestAnimationFrame(frame);
     }
     requestAnimationFrame(frame);
