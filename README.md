@@ -93,6 +93,12 @@ With `d` the cursor's distance in points from where the button was pressed:
 Beyond ~200 pt the recorded body travel plateaus (it contains a single long flick), but by hand the app keeps stretching,
 so the model deliberately keeps growing — slowly, without a ceiling (see the shaded area below).
 
+**Any size.** The numbers above come from a 44 pt circle. For other sizes the *absolute* change follows them, not the
+ratio: along the pull the factor is `1 + e·√(44/L)`, across it `1 − (1 − 1/(1+e))·(44/L)`, where `L` is the button's length
+on that axis. A 44 pt circle behaves exactly as measured; a 108 pt pill pulled down keeps its width (−2 pt instead of
+−10 pt); a 360 pt bar pulled sideways grows by ~9 % instead of ~30 %. Press swell scales the same way. (The AppKit glass
+margin grows with the width too, so long buttons are never clipped.)
+
 Pulled along an axis the shape scales `×(1+e)` along it and `÷(1+e)` across it. Pulled diagonally the
 axial part fades out and the whole button grows `1 + 0.6·e` instead. Springs (stiffness / damping):
 

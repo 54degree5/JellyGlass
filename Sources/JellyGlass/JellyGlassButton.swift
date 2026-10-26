@@ -14,8 +14,9 @@ import AppKit
 ///     stretch                   e(d) = 0.105 · ln(1 + d / 50) · d² / (d² + 40²)
 ///
 /// Both grow logarithmically, so there is no ceiling: the further you pull, the less each extra point adds.
-/// The scaling is axis-aligned (the shape never rotates); pulled along an axis it stretches ×(1+e) along it and
-/// ÷(1+e) across it (same area); pulled diagonally it does not elongate but grows uniformly.
+/// The scaling is axis-aligned (the shape never rotates); pulled along an axis it stretches along it and squashes
+/// across it (about the same area); pulled diagonally it does not elongate but grows uniformly. The numbers above are
+/// for a 44 pt button; for other sizes the *absolute* change follows them, so buttons of any length keep the same feel.
 ///
 /// ## How the glass is deformed
 /// An `NSGlassEffectContainerView` renders all its glass children through one SDF canvas that is sized to the
@@ -119,7 +120,7 @@ public final class JellyGlassButton: NSView {
         var scale = CGVector(dx: 1, dy: 1)
     }
 
-    private let margin: CGFloat = 90          // room for the deformed silhouette around the resting button
+    private let margin: CGFloat                // room for the deformed silhouette around the resting button (grows with the width)
     private let content = NSView()
 
     private var shape = Motion()              // silhouette
@@ -136,6 +137,7 @@ public final class JellyGlassButton: NSView {
     ///     with the glass.
     public init(size: CGSize, contentView: NSView) {
         self.size = size
+        self.margin = max(90, size.width * 0.3)
         super.init(frame: NSRect(origin: .zero, size: size))
         wantsLayer = true
         clipsToBounds = false
@@ -173,23 +175,31 @@ public final class JellyGlassButton: NSView {
     /// Pull = cursor minus press point, in this view's coordinates (y up), in points.
     private func setPull(_ pull: CGVector) {
         let d = hypot(pull.dx, pull.dy)
-        let press: CGFloat = dragging ? pressGrowth : 1
-        guard d > 0.001 else { target = Pose(offset: .zero, scale: CGVector(dx: press, dy: press)); return }
+        // The model was measured on a 44 pt circle. For any other size the absolute change follows it, not the ratio:
+        // a long pill gains a few points of length instead of a third of it, and a narrow cross-section does not
+        // collapse. Along the pull the factor is ∝ sqrt(R/L), across it ∝ R/L.
+        let reference: CGFloat = 44
+        let wx = (reference / size.width).squareRoot(), wy = (reference / size.height).squareRoot()
+        let held: CGFloat = dragging ? 1 : 0
+        let pressX = 1 + held * (pressGrowth - 1) * wx, pressY = 1 + held * (pressGrowth - 1) * wy
+        guard d > 0.001 else { target = Pose(offset: .zero, scale: CGVector(dx: pressX, dy: pressY)); return }
         let r = stretch.response
 
         let travel = r.travel * log(1 + d / r.travelScale)
         let soft = d * d / (d * d + r.softStart * r.softStart)        // no stretch right at the press point
         let e = r.stretch * log(1 + d / r.stretchScale) * soft
 
+        let horizontal = abs(pull.dx) >= abs(pull.dy)
         // How axis-aligned the pull is: 1 along an axis, 0 on the 45° diagonal.
         let phi = atan2(abs(pull.dy), abs(pull.dx))
         let alignment = abs(cos(2 * phi))
-        let grow = 1 + 0.6 * e * (1 - alignment)          // diagonal pull: uniform growth
-        let stretchFactor = 1 + e * alignment             // axial pull: stretch / squash
+        let along = horizontal ? size.width : size.height, cross = horizontal ? size.height : size.width
+        let stretchAlong = 1 + e * alignment * (reference / along).squareRoot()            // axial pull: stretch ...
+        let stretchAcross = 1 - (1 - 1 / (1 + e * alignment)) * (reference / cross)          // ... and squash
+        let growX = 1 + 0.6 * e * (1 - alignment) * wx, growY = 1 + 0.6 * e * (1 - alignment) * wy   // diagonal: grow
 
-        var scale = CGVector(dx: grow / stretchFactor, dy: grow * stretchFactor)
-        if abs(pull.dx) >= abs(pull.dy) { scale = CGVector(dx: grow * stretchFactor, dy: grow / stretchFactor) }
-        scale = CGVector(dx: scale.dx * press, dy: scale.dy * press)
+        let scale = CGVector(dx: growX * (horizontal ? stretchAlong : stretchAcross) * pressX,
+                             dy: growY * (horizontal ? stretchAcross : stretchAlong) * pressY)
         target = Pose(offset: CGVector(dx: pull.dx / d * travel, dy: pull.dy / d * travel), scale: scale)
     }
 

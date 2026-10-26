@@ -244,18 +244,26 @@
     setPull(dx, dy) {
       const ui = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ui')) || 1;
       dx /= ui; dy /= ui;                              // pull in stage points, like the native version
-      const d = Math.hypot(dx, dy), press = this.dragging ? PRESS_GROWTH : 1;
-      if (d < 0.001) { this.target = { ox: 0, oy: 0, sx: press, sy: press }; return; }
+      const d = Math.hypot(dx, dy), W = this.el.offsetWidth, H = this.el.offsetHeight, R = 44;
+      // The model was measured on a 44 pt circle (R). For any other size the *absolute* change follows it, not the
+      // ratio, so a long pill gains a few points of length instead of a third of it, and a narrow cross-section
+      // does not collapse: along ∝ sqrt(R/L), across ∝ R/L.
+      const wx = Math.sqrt(R / W), wy = Math.sqrt(R / H);
+      const press = this.dragging ? 1 : 0;
+      const pressX = 1 + press * (PRESS_GROWTH - 1) * wx, pressY = 1 + press * (PRESS_GROWTH - 1) * wy;
+      if (d < 0.001) { this.target = { ox: 0, oy: 0, sx: pressX, sy: pressY }; return; }
       const r = STRETCH[state.stretch];
       const travel = r.travel * Math.log(1 + d / r.travelScale);
       const soft = d * d / (d * d + r.soft * r.soft);                 // no stretch right at the press point
       const e = r.stretch * Math.log(1 + d / r.stretchScale) * soft;
+      const horizontal = Math.abs(dx) >= Math.abs(dy);
       const alignment = Math.abs(Math.cos(2 * Math.atan2(Math.abs(dy), Math.abs(dx)))); // 1 on an axis, 0 on the diagonal
-      const grow = 1 + 0.6 * e * (1 - alignment);                     // diagonal pull: uniform growth
-      const stretch = 1 + e * alignment;                              // axial pull: stretch / squash
-      let sx = grow / stretch, sy = grow * stretch;
-      if (Math.abs(dx) >= Math.abs(dy)) { sx = grow * stretch; sy = grow / stretch; }
-      this.target = { ox: dx / d * travel, oy: dy / d * travel, sx: sx * press, sy: sy * press };
+      const La = horizontal ? W : H, Lc = horizontal ? H : W;
+      const along = 1 + e * alignment * Math.sqrt(R / La);            // axial pull: stretch ...
+      const across = 1 - (1 - 1 / (1 + e * alignment)) * (R / Lc);    // ... and squash
+      const growX = 1 + 0.6 * e * (1 - alignment) * wx, growY = 1 + 0.6 * e * (1 - alignment) * wy;   // diagonal: grow
+      const sx = growX * (horizontal ? along : across) * pressX, sy = growY * (horizontal ? across : along) * pressY;
+      this.target = { ox: dx / d * travel, oy: dy / d * travel, sx, sy };
     }
     tick(dt) {
       const s = SPRINGS[state.spring], h = this.dragging, steps = 8, h8 = dt / steps;
