@@ -161,10 +161,6 @@ issue), and anything that makes the AppKit side less private-API-dependent.
   </picture>
 </a>
 
-## Contributors
-
-<a href="https://github.com/54degree5/JellyGlass/graphs/contributors"><img alt="Contributors" src="https://contrib.rocks/image?repo=54degree5/JellyGlass"></a>
-
 ## License
 
 MIT — see [LICENSE](LICENSE).
