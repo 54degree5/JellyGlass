@@ -1,0 +1,151 @@
+<div align="center">
+
+# JellyGlass
+
+**Liquid Glass that stretches like jelly under your cursor.**
+
+AppKit buttons for macOS 26 that swell when pressed, follow your drag, stretch along the pull,\
+and wobble back — plus a dependency-free web version you can try in a browser.
+
+[![Live demo](https://img.shields.io/badge/live%20demo-try%20it-8c66ff?style=for-the-badge)](https://54degree5.github.io/JellyGlass/)
+![macOS 26+](https://img.shields.io/badge/macOS-26%2B-111?style=for-the-badge&logo=apple)
+![Swift 6](https://img.shields.io/badge/Swift-6-f05138?style=for-the-badge&logo=swift&logoColor=white)
+![MIT](https://img.shields.io/badge/license-MIT-2ea44f?style=for-the-badge)
+
+<img src="docs/media/showreel.gif" alt="Glass buttons stretching, lifting over neighbours and wobbling back" width="720">
+
+</div>
+
+---
+
+## Why
+
+macOS 26's `NSGlassEffectView` gives you the Liquid Glass *material*. It does not give you the *feel* — the
+way glass in a polished app gives under your finger. JellyGlass adds that feel, and writes down what it took
+to get it working inside AppKit's glass containers (it is less obvious than it sounds — see
+[How it works](#how-it-works)).
+
+- **Press**: the glass swells 7 % and lightens.
+- **Drag**: it follows the cursor with a small, rubber-banded travel and stretches along the axis of the pull
+  (area preserved). Pull diagonally and it simply grows. Never rotates.
+- **No ceiling**: stretch and travel grow with a logarithm of the cursor distance, so the further you pull the
+  less each extra point adds, and it never hits a hard stop.
+- **Release**: the glass wobbles back on a jelly spring while the icon bounces on its own, springier one.
+- **On top or merge**: the pressed button is lifted over its neighbours (default), or melts into them through
+  the container's glass group.
+
+The numbers are not guessed: they were measured, frame by frame, from a screen recording of a production app
+([MEASUREMENTS.md](docs/MEASUREMENTS.md)).
+
+## Try it
+
+**In the browser** (any modern browser, no install): <https://54degree5.github.io/JellyGlass/>
+
+**On your Mac** (macOS 26+, Xcode 26 / Swift 6.2+):
+
+```bash
+git clone https://github.com/54degree5/JellyGlass.git
+cd JellyGlass
+swift run -c release JellyGlassDemo
+```
+
+Drag any button. Keys: `K` on top ⇄ merge · `S` spring (jelly / wobble / snappy) · `A` stretch
+(standard / wide / heavy) · `C` glass style.
+
+## Use it in your app
+
+```swift
+// Package.swift
+.package(url: "https://github.com/54degree5/JellyGlass.git", branch: "main")
+```
+
+```swift
+import JellyGlass
+
+let mic = JellyGlassButton(size: CGSize(width: 44, height: 44), symbols: ["mic"])
+mic.spring = .jelly            // .jelly (default) · .wobble · .snappy
+mic.stretch = .standard        // .standard · .wide · .heavy
+mic.liftsOnPress = true        // false: melt into neighbours instead
+
+// Optional: group buttons so neighbours share one glass surface and merge when `liftsOnPress` is false.
+let group = NSGlassEffectContainerView()
+group.spacing = 14
+let holder = NSView(frame: group.bounds)
+holder.addSubview(mic)
+group.contentView = holder
+```
+
+Any view works as content: `JellyGlassButton(size:contentView:)`. The button deforms its glass *and* its content.
+
+## The model
+
+With `d` the cursor's distance in points from where the button was pressed:
+
+| | formula | at d = 38 / 80 / 185 / 800 pt |
+|---|---|---|
+| body travel `t(d)` | `6.5 · ln(1 + d / 28)` | 5.6 / 8.8 / 13.2 / 22 pt |
+| stretch `e(d)` | `0.105 · ln(1 + d / 50) · d² / (d² + 40²)` | 0.03 / 0.08 / 0.16 / 0.30 |
+
+Pulled along an axis the shape scales `×(1+e)` along it and `÷(1+e)` across it. Pulled diagonally the
+axial part fades out and the whole button grows `1 + 0.6·e` instead. Springs (stiffness / damping):
+
+| preset | held | after release |
+|---|---|---|
+| `jelly` | 1500 / 70 | 420 / 12 — swings past rest once or twice |
+| `wobble` | 1500 / 70 | 240 / 6 |
+| `snappy` | 3600 / 120 | 3600 / 120 — back in ~60 ms |
+
+<img src="docs/media/measurements.png" alt="Cursor and button tracked per frame" width="720">
+
+## How it works
+
+The short version of what is not in any documentation:
+
+1. A glass container renders **all** its children through one SDF canvas that is sized to the *undeformed*
+   buttons and reset on every layout. Transform the glass layers and the blur is clipped to the old box.
+2. So the `NSGlassEffectView` is made **larger than the button** (a 90 pt margin) and its silhouette is set with
+   the private `_setPath:` — the resting capsule, scaled and shifted every frame — and the container is asked
+   to re-layout each frame so it re-reads the path. The icons live in the content view with their own spring.
+3. The private `_interactionState = 1` lifts a glass out of its group and draws it on top of its neighbours
+   (a highlight, no merging). That is the default "on top" behaviour; leave it off and the button melts
+   into neighbours instead.
+4. Merging has physics: the bridge between two glasses appears when the gap is below `spacing / 2`, but they
+   start leaning toward each other already below `spacing`. Resting gap ≥ `spacing` avoids pointed tips at rest.
+
+Full write-up with the layer tree and the dead ends: [docs/HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md).
+
+## Web version
+
+[`docs/index.html`](docs/index.html) is a single file, no dependencies. It is a 1:1 port of the physics (same
+formulas, same springs) on top of `backdrop-filter` glass. What carries over exactly: axis-aligned stretch,
+unbounded logarithmic growth, diagonal growth, press swell, tint, jelly and icon springs, on-top lift.
+What is approximate: the glass itself — CSS has no Liquid Glass material, so it is blur + saturation + rim light,
+and there is no container-level merging. Contributions that add SVG refraction or a gooey merge are welcome.
+
+## Caveats
+
+- **Private API.** `_setPath:` and `_interactionState` are private AppKit selectors, resolved at runtime
+  (they exist on macOS 26). Fine for tools and experiments, not for the App Store. If a selector goes missing
+  the call is skipped and the button degrades to icon animation only.
+- **macOS 26+** (Tahoe). Earlier systems have no `NSGlassEffectView`.
+- The model was measured from one recording of one button. It matches that recording closely; other buttons
+  and larger pulls are extrapolation.
+- Not affiliated with Telegram or Apple. The interaction was observed in Telegram for macOS; no Telegram code
+  or assets are used. See also [liquid-glass-react](https://www.npmjs.com/package/liquid-glass-react) for the web.
+
+## Roadmap
+
+- [ ] SVG refraction for the web demo
+- [ ] Gooey merge for the web demo
+- [ ] SwiftUI wrapper (`JellyGlass { … }`)
+- [ ] Haptics and sound hooks
+- [ ] Per-button response presets for large controls
+
+## Contributing
+
+Issues and PRs welcome — especially measurements from other apps (record the screen, drop the file in an
+issue), and anything that makes the AppKit side less private-API-dependent.
+
+## License
+
+MIT — see [LICENSE](LICENSE).

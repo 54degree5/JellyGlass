@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>JellyGlass</title>
+<meta name="description" content="Liquid Glass that stretches like jelly under your cursor. Drag the buttons.">
+<meta property="og:title" content="JellyGlass">
+<meta property="og:description" content="Liquid Glass that stretches like jelly. Drag the buttons.">
+<meta property="og:image" content="media/preview.png">
+<meta name="theme-color" content="#1a0f2e">
+<style>
+  :root {
+    --ui: 1;                         /* whole-stage scale, set from JS so it fits narrow screens */
+    --btn: 44px;                     /* button height */
+    --gap: 14px;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; margin: 0; background: #130a22; overflow: hidden;
+    font: 13px/1.3 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif; color: #fff; }
+
+  /* ---------- backdrop: moving colour blobs + a grid so the blur and edges are visible ---------- */
+  #bg { position: fixed; inset: 0; overflow: hidden;
+    background: linear-gradient(135deg, #0d0f33 0%, #47145f 52%, #0a3855 100%); }
+  .blob { position: absolute; width: 46vmax; height: 46vmax; border-radius: 50%; filter: blur(8px); opacity: .95;
+    animation: drift 18s ease-in-out infinite alternate; }
+  .blob:nth-child(1) { left: -8vmax; top: -6vmax; background: radial-gradient(circle, #ff5a73 0%, #ff5a7300 66%); }
+  .blob:nth-child(2) { right: -10vmax; top: 4vmax; background: radial-gradient(circle, #33ccff 0%, #33ccff00 66%); animation-duration: 23s; }
+  .blob:nth-child(3) { left: 26vmax; bottom: -16vmax; background: radial-gradient(circle, #ffcc33 0%, #ffcc3300 66%); animation-duration: 29s; }
+  .blob:nth-child(4) { right: 10vmax; bottom: -20vmax; background: radial-gradient(circle, #8c66ff 0%, #8c66ff00 66%); animation-duration: 21s; }
+  .blob:nth-child(5) { left: -14vmax; bottom: -10vmax; background: radial-gradient(circle, #33ff99 0%, #33ff9900 66%); animation-duration: 26s; }
+  @keyframes drift { to { transform: translate(18vmax, -9vmax) scale(1.12); } }
+  #grid { position: absolute; inset: 0; opacity: .13;
+    background-image: linear-gradient(#fff 1.5px, transparent 1.5px), linear-gradient(90deg, #fff 1.5px, transparent 1.5px);
+    background-size: 22px 22px, 44px 44px; background-position: 0 0, 0 0; }
+
+  /* ---------- stage ---------- */
+  #stage { position: fixed; left: 50%; top: 46%; width: 520px; height: 330px;
+    transform: translate(-50%, -50%) scale(var(--ui)); transform-origin: 50% 50%; touch-action: none; }
+  .row { position: absolute; display: flex; gap: var(--gap); align-items: center; }
+  #header { right: 0; top: 0; }
+  #bar { left: 0; right: 0; bottom: 0; justify-content: space-between; }
+  #bar .tail { display: flex; gap: var(--gap); }
+
+  /* ---------- a jelly glass button ---------- */
+  .jb { position: relative; height: var(--btn); width: var(--w); touch-action: none; user-select: none; -webkit-user-select: none;
+    cursor: grab; z-index: 1; }
+  .jb.held { cursor: grabbing; z-index: 10; }               /* "on top": the pressed one is drawn over its neighbours */
+  .jb-glass, .jb-icon { position: absolute; inset: 0; will-change: transform; transform-origin: 50% 50%; }
+  .jb-glass {
+    --p: 0;                                                  /* press level 0..1, driven from JS */
+    border-radius: 999px;
+    background:
+      linear-gradient(135deg, rgba(255,255,255,calc(.17 + .17 * var(--p))), rgba(255,255,255,calc(.05 + .10 * var(--p))));
+    -webkit-backdrop-filter: blur(14px) saturate(1.8) brightness(1.06);
+    backdrop-filter: blur(14px) saturate(1.8) brightness(1.06);
+    box-shadow:
+      inset 0 0 0 1px rgba(255,255,255,.30),
+      inset 0 1.5px 1px rgba(255,255,255,.55),
+      inset 0 -10px 18px rgba(255,255,255,.07),
+      0 10px 28px rgba(8,2,30,.30);
+  }
+  .jb.held .jb-glass { box-shadow: inset 0 0 0 1px rgba(255,255,255,.45), inset 0 1.5px 1px rgba(255,255,255,.7),
+      inset 0 -10px 18px rgba(255,255,255,.10), 0 16px 36px rgba(8,2,30,.38); }
+  .jb-icon { display: flex; align-items: center; justify-content: space-around; color: rgba(255,255,255,.94); pointer-events: none; }
+  .jb-icon svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .jb-icon svg .f { fill: currentColor; stroke: none; }
+
+  /* ---------- chrome: title, links, two tiny controls ---------- */
+  #title { position: fixed; left: 18px; top: 16px; font-weight: 600; letter-spacing: .02em; opacity: .9; }
+  #title a { color: inherit; text-decoration: none; opacity: .7; margin-left: 10px; font-weight: 500; }
+  #title a:hover { opacity: 1; }
+  #controls { position: fixed; left: 0; right: 0; bottom: max(18px, env(safe-area-inset-bottom)); display: flex; gap: 14px;
+    justify-content: center; flex-wrap: wrap; padding: 0 12px; }
+  .seg { display: inline-flex; padding: 3px; border-radius: 999px; background: rgba(255,255,255,.10);
+    -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); box-shadow: inset 0 0 0 1px rgba(255,255,255,.18); }
+  .seg button { all: unset; cursor: pointer; padding: 6px 13px; border-radius: 999px; color: rgba(255,255,255,.65); }
+  .seg button[aria-pressed="true"] { background: rgba(255,255,255,.22); color: #fff; box-shadow: inset 0 0 0 1px rgba(255,255,255,.25); }
+  #hint { position: fixed; left: 0; right: 0; top: 48px; text-align: center; opacity: .55; pointer-events: none; transition: opacity .6s; }
+  @media (prefers-reduced-motion: reduce) { .blob { animation: none; } }
+</style>
+</head>
+<body>
+<div id="bg"><div class="blob"></div><div class="blob"></div><div class="blob"></div><div class="blob"></div><div class="blob"></div><div id="grid"></div></div>
+
+<div id="title">JellyGlass <a href="https://github.com/54degree5/JellyGlass">GitHub</a></div>
+<div id="hint">drag a button</div>
+
+<div id="stage">
+  <div class="row" id="header">
+    <div class="jb" style="--w:44px" data-icons="pin"></div>
+    <div class="jb" style="--w:100px" data-icons="search,dots"></div>
+  </div>
+  <div class="row" id="bar">
+    <div class="jb" style="--w:44px" data-icons="clip"></div>
+    <div class="tail">
+      <div class="jb" style="--w:108px" data-icons="gift,smile"></div>
+      <div class="jb" style="--w:44px" data-icons="mic"></div>
+    </div>
+  </div>
+</div>
+
+<div id="controls">
+  <div class="seg" id="seg-spring" role="group" aria-label="spring"></div>
+  <div class="seg" id="seg-stretch" role="group" aria-label="stretch"></div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  /* ------------------------------------------------------------------------------------------------
+     The model, ported 1:1 from the macOS implementation (Sources/JellyGlass/JellyGlassButton.swift).
+     d = cursor distance in px from where the button was pressed.
+       translation  t(d) = travel · ln(1 + d / travelScale)
+       stretch      e(d) = stretch · ln(1 + d / stretchScale) · d² / (d² + soft²)
+     No ceiling – both grow logarithmically. Scaling is axis-aligned; a diagonal pull grows the button
+     uniformly instead of elongating it.
+  ------------------------------------------------------------------------------------------------ */
+  const SPRINGS = {                                  // [stiffness, damping]; glass/icon, while held / after release
+    jelly:  { dragGlass: [1500, 70],  dragIcon: [1100, 50],  releaseGlass: [420, 12],  releaseIcon: [340, 9] },
+    wobble: { dragGlass: [1500, 70],  dragIcon: [1100, 50],  releaseGlass: [240, 6],   releaseIcon: [200, 5] },
+    snappy: { dragGlass: [3600, 120], dragIcon: [2000, 45],  releaseGlass: [3600, 120], releaseIcon: [2000, 45] },
+  };
+  const STRETCH = {
+    standard: { travel: 6.5, travelScale: 28, stretch: 0.105, stretchScale: 50, soft: 40 },
+    wide:     { travel: 9.8, travelScale: 28, stretch: 0.16,  stretchScale: 50, soft: 40 },
+    heavy:    { travel: 13,  travelScale: 28, stretch: 0.21,  stretchScale: 50, soft: 40 },
+  };
+  const PRESS_GROWTH = 1.07;                         // the button swells while held
+  const state = { spring: 'jelly', stretch: 'standard' };
+
+  const ICONS = {
+    clip:   '<svg viewBox="0 0 24 24"><path d="M17.8 9.3l-7.4 7.4a2.5 2.5 0 0 1-3.5-3.5l7.8-7.8a4.2 4.2 0 0 1 6 6l-8.2 8.2a5.7 5.7 0 0 1-8.1-8.1l6.8-6.8"/></svg>',
+    gift:   '<svg viewBox="0 0 24 24"><rect x="4" y="10.5" width="16" height="9.5" rx="1.6"/><rect x="3" y="7" width="18" height="3.5" rx="1.1"/><path d="M12 7v13M12 7C10.6 3.6 6.6 3.8 7.2 6c.3 1.1 2.8 1 4.8 1 2 0 4.5.1 4.8-1 .6-2.2-3.4-2.4-4.8 1z"/></svg>',
+    smile:  '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.4"/><circle class="f" cx="9" cy="10" r="1.1"/><circle class="f" cx="15" cy="10" r="1.1"/><path d="M8.3 14.2c1 1.7 2.2 2.4 3.7 2.4s2.7-.7 3.7-2.4"/></svg>',
+    mic:    '<svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11.5" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3.2"/></svg>',
+    search: '<svg viewBox="0 0 24 24"><circle cx="10.8" cy="10.8" r="6.2"/><path d="M15.4 15.4l5 5"/></svg>',
+    dots:   '<svg viewBox="0 0 24 24"><circle class="f" cx="5" cy="12" r="1.7"/><circle class="f" cx="12" cy="12" r="1.7"/><circle class="f" cx="19" cy="12" r="1.7"/></svg>',
+    pin:    '<svg viewBox="0 0 24 24"><path d="M8.2 3.5h7.6M9.4 3.5v5.8l-3 4.2h11.2l-3-4.2V3.5M12 13.5v7"/></svg>',
+  };
+
+  class Motion {                                     // an animated pose: body offset + axis scale, with velocities
+    constructor() { this.reset(); }
+    reset() { this.ox = 0; this.oy = 0; this.vx = 0; this.vy = 0; this.sx = 1; this.sy = 1; this.vsx = 0; this.vsy = 0; }
+    step(t, k, c, dt) {
+      this.vx  += (k * (t.ox - this.ox) - c * this.vx)  * dt;
+      this.vy  += (k * (t.oy - this.oy) - c * this.vy)  * dt;
+      this.vsx += (k * (t.sx - this.sx) - c * this.vsx) * dt;
+      this.vsy += (k * (t.sy - this.sy) - c * this.vsy) * dt;
+      this.ox += this.vx * dt; this.oy += this.vy * dt; this.sx += this.vsx * dt; this.sy += this.vsy * dt;
+    }
+    get atRest() {
+      return Math.hypot(this.ox, this.oy) < 0.02 && Math.hypot(this.vx, this.vy) < 0.05 &&
+             Math.abs(this.sx - 1) < 0.0005 && Math.abs(this.sy - 1) < 0.0005 && Math.hypot(this.vsx, this.vsy) < 0.005;
+    }
+  }
+
+  const active = new Set();
+  let raf = 0, last = 0;
+
+  class Jelly {
+    constructor(el) {
+      this.el = el;
+      el.innerHTML = '<div class="jb-glass"></div><div class="jb-icon"></div>';
+      this.glass = el.firstChild; this.icon = el.lastChild;
+      this.icon.innerHTML = el.dataset.icons.split(',').map(n => ICONS[n]).join('');
+      this.shape = new Motion(); this.iconMotion = new Motion();
+      this.target = { ox: 0, oy: 0, sx: 1, sy: 1 };
+      this.dragging = false; this.pressLevel = 0; this.start = { x: 0, y: 0 };
+      el.addEventListener('pointerdown', e => this.down(e));
+      el.addEventListener('pointermove', e => this.move(e));
+      el.addEventListener('pointerup', e => this.up(e));
+      el.addEventListener('pointercancel', e => this.up(e));
+      el.addEventListener('lostpointercapture', e => this.up(e));
+    }
+    down(e) {
+      if (this.dragging) return;
+      e.preventDefault();
+      this.el.setPointerCapture(e.pointerId);
+      this.start = { x: e.clientX, y: e.clientY };
+      this.dragging = true; this.el.classList.add('held');
+      this.setPull(0, 0); wake(this);
+      document.getElementById('hint').style.opacity = 0;
+    }
+    move(e) { if (this.dragging) { this.setPull(e.clientX - this.start.x, e.clientY - this.start.y); wake(this); } }
+    up() {
+      if (!this.dragging) return;
+      this.dragging = false; this.el.classList.remove('held');
+      this.target = { ox: 0, oy: 0, sx: 1, sy: 1 }; wake(this);
+    }
+    setPull(dx, dy) {
+      const ui = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ui')) || 1;
+      dx /= ui; dy /= ui;                              // pull in stage points, like the native version
+      const d = Math.hypot(dx, dy), press = this.dragging ? PRESS_GROWTH : 1;
+      if (d < 0.001) { this.target = { ox: 0, oy: 0, sx: press, sy: press }; return; }
+      const r = STRETCH[state.stretch];
+      const travel = r.travel * Math.log(1 + d / r.travelScale);
+      const soft = d * d / (d * d + r.soft * r.soft);                 // no stretch right at the press point
+      const e = r.stretch * Math.log(1 + d / r.stretchScale) * soft;
+      const alignment = Math.abs(Math.cos(2 * Math.atan2(Math.abs(dy), Math.abs(dx)))); // 1 on an axis, 0 on the diagonal
+      const grow = 1 + 0.6 * e * (1 - alignment);                     // diagonal pull: uniform growth
+      const stretch = 1 + e * alignment;                              // axial pull: stretch / squash
+      let sx = grow / stretch, sy = grow * stretch;
+      if (Math.abs(dx) >= Math.abs(dy)) { sx = grow * stretch; sy = grow / stretch; }
+      this.target = { ox: dx / d * travel, oy: dy / d * travel, sx: sx * press, sy: sy * press };
+    }
+    tick(dt) {
+      const s = SPRINGS[state.spring], h = this.dragging, steps = 8, h8 = dt / steps;
+      const g = h ? s.dragGlass : s.releaseGlass, i = h ? s.dragIcon : s.releaseIcon;
+      for (let n = 0; n < steps; n++) {
+        this.shape.step(this.target, g[0], g[1], h8);
+        this.iconMotion.step(this.target, i[0], i[1], h8);
+      }
+      this.pressLevel += ((h ? 1 : 0) - this.pressLevel) * (1 - Math.exp(-dt / (h ? 0.07 : 0.18)));
+      this.render();
+      if (!h && this.shape.atRest && this.iconMotion.atRest && this.pressLevel < 0.002) {
+        this.shape.reset(); this.iconMotion.reset(); this.pressLevel = 0; this.render(); return false;
+      }
+      return true;
+    }
+    render() {
+      const m = this.shape, n = this.iconMotion;
+      this.glass.style.transform = `translate(${m.ox}px, ${m.oy}px) scale(${m.sx}, ${m.sy})`;
+      this.icon.style.transform  = `translate(${n.ox}px, ${n.oy}px) scale(${n.sx}, ${n.sy})`;
+      this.glass.style.setProperty('--p', this.pressLevel.toFixed(3));
+    }
+  }
+
+  function wake(j) { active.add(j); if (!raf) { last = performance.now(); raf = requestAnimationFrame(loop); } }
+  function loop(now) {
+    const dt = Math.min((now - last) / 1000, 1 / 30); last = now;
+    for (const j of [...active]) if (!j.tick(dt)) active.delete(j);
+    raf = active.size ? requestAnimationFrame(loop) : 0;
+  }
+
+  const jellies = [...document.querySelectorAll('.jb')].map(el => new Jelly(el));
+
+  // ---------- controls ----------
+  function segment(host, key, options) {
+    for (const name of options) {
+      const b = document.createElement('button');
+      b.textContent = name; b.setAttribute('aria-pressed', String(state[key] === name));
+      b.onclick = () => { state[key] = name; for (const x of host.children) x.setAttribute('aria-pressed', String(x === b)); };
+      host.appendChild(b);
+    }
+  }
+  segment(document.getElementById('seg-spring'), 'spring', Object.keys(SPRINGS));
+  segment(document.getElementById('seg-stretch'), 'stretch', Object.keys(STRETCH));
+
+  // ---------- fit the stage on narrow screens ----------
+  function fit() {
+    const k = Math.min(1, (innerWidth - 24) / 520, (innerHeight - 140) / 330);
+    document.documentElement.style.setProperty('--ui', Math.max(k, 0.55).toFixed(3));
+  }
+  addEventListener('resize', fit); fit();
+
+  // deep link for screenshots / testing: #pull=mic,-120,0  (hold a pull without a mouse)
+  const m = /pull=(\w+),(-?\d+),(-?\d+)/.exec(location.hash);
+  if (m) {
+    const idx = { pin: 0, search: 1, clip: 2, gift: 3, mic: 4 }[m[1]] ?? 4;
+    const j = jellies[idx]; j.dragging = true; j.el.classList.add('held');
+    j.setPull(+m[2], +m[3]); wake(j);
+  }
+})();
+</script>
+</body>
+</html>
