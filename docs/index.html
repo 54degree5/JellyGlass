@@ -255,12 +255,16 @@
   }
   addEventListener('resize', fit); fit();
 
-  // deep link for screenshots / testing: #pull=mic,-120,0  (hold a pull without a mouse)
+  // deep link for screenshots / testing: #pull=mic,-120,0  (hold a pull without a mouse), add &still to skip the spring
   const m = /pull=(\w+),(-?\d+),(-?\d+)/.exec(location.hash);
   if (m) {
     const idx = { pin: 0, search: 1, clip: 2, gift: 3, mic: 4 }[m[1]] ?? 4;
     const j = jellies[idx]; j.dragging = true; j.el.classList.add('held');
     j.setPull(+m[2], +m[3]); wake(j);
+    if (/still/.test(location.hash)) {            // jump straight to the settled pose (static screenshots)
+      for (const mo of [j.shape, j.iconMotion]) { mo.ox = j.target.ox; mo.oy = j.target.oy; mo.sx = j.target.sx; mo.sy = j.target.sy; }
+      j.pressLevel = 1; j.render();
+    }
   }
 })();
 </script>
