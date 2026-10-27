@@ -12,12 +12,12 @@ and wobble back — plus a dependency-free web version you can try in a browser.
 <table>
 <tr>
 <td align="center" width="50%">
-<a href="https://github.com/54degree5/JellyGlass/releases/latest"><img src="docs/media/showreel.gif" alt="macOS: system Liquid Glass buttons swell, stretch along the pull and wobble back" width="430"></a><br>
+<a href="https://github.com/54degree5/JellyGlass/releases/latest"><img src="docs/media/showreel.gif" alt="macOS: system Liquid Glass buttons swell, stretch along the pull and wobble back" width="100%"></a><br>
 <b>macOS</b> &nbsp;·&nbsp; AppKit, the system's own glass<br>
 <a href="https://github.com/54degree5/JellyGlass/releases/latest">Download the app</a> &nbsp;·&nbsp; <a href="#use-it-in-your-app">Swift package</a>
 </td>
 <td align="center" width="50%">
-<a href="https://54degree5.github.io/JellyGlass/"><img src="docs/media/web.gif" alt="Web: refractive WebGL glass buttons swell, stretch along the pull and wobble back" width="430"></a><br>
+<a href="https://54degree5.github.io/JellyGlass/"><img src="docs/media/web.gif" alt="Web: refractive WebGL glass buttons swell, stretch along the pull and wobble back" width="100%"></a><br>
 <b>Web</b> &nbsp;·&nbsp; WebGL2, one HTML file<br>
 <a href="https://54degree5.github.io/JellyGlass/">Try it in the browser</a> &nbsp;·&nbsp; <a href="https://54degree5.github.io/JellyGlass/shapes.html">Other shapes</a>
 </td>
