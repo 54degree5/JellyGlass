@@ -6,14 +6,14 @@ import JellyGlass
 //   K        switch to "merge": the pressed button melts into its neighbour instead
 //   S        spring  (jelly / wobble / snappy)
 //   A        stretch (standard / wide / heavy)
-//   C        glass style (regular / clear)
+//   C        glass style (clear / regular)
 //
 // Launch flags (tests, screenshots, recording):
 //   --showreel                     play a scripted sequence of drags
 //   --pull TARGET DX DY            hold a pull; TARGET = attach|pill|mic|pin|search
 //   --ready-file PATH [--ready-after SECONDS]   write the window number there when the scene is ready
 //   --stage-file PATH              write the rectangle around all buttons (screen points, top-left origin) as "x y w h"
-//   --merge   --style clear   --spring N   --stretch N
+//   --merge   --style regular   --spring N   --stretch N
 
 final class RootView: NSView {
     let backdrop = BackdropView()
@@ -106,7 +106,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let bar = root.bar, header = root.header
         if args.contains("--merge") { root.allButtons.forEach { $0.liftsOnPress = false } }
-        if value("--style") == "clear" { root.allButtons.forEach { $0.glass.style = .clear } }
+        if value("--style") != "regular" { root.allButtons.forEach { $0.glass.style = .clear } }     // clear glass by default
         if let n = value("--spring").flatMap({ Int($0) }) {
             root.allButtons.forEach { $0.spring = JellyGlassButton.Spring.allCases[n % JellyGlassButton.Spring.allCases.count] }
         }

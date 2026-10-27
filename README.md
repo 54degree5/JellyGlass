@@ -2,14 +2,14 @@
 
 # JellyGlass
 
-**Liquid Glass that stretches like jelly under your cursor.**
+**Stretchy Liquid Glass (iOS style) for macOS and websites.**
 
 AppKit buttons for macOS 26 that swell when pressed, follow your drag, stretch along the pull,\
 and wobble back — plus a dependency-free web version you can try in a browser.
 
 [![Live demo](https://img.shields.io/badge/live%20demo-try%20it-8c66ff?style=for-the-badge)](https://54degree5.github.io/JellyGlass/) ![macOS 26+](https://img.shields.io/badge/macOS-26%2B-111?style=for-the-badge&logo=apple) ![Swift 6](https://img.shields.io/badge/Swift-6-f05138?style=for-the-badge&logo=swift&logoColor=white) ![MIT](https://img.shields.io/badge/license-MIT-2ea44f?style=for-the-badge)
 
-<a href="docs/media/showreel.mp4"><img src="docs/media/showreel.gif" alt="A mouse cursor presses glass buttons and wanders with them: they swell, stretch along the pull, lift over their neighbours and wobble back" width="760"></a>
+<a href="https://54degree5.github.io/JellyGlass/"><img src="docs/media/web.gif" alt="A mouse cursor presses refractive glass buttons in the browser and wanders with them: they swell, stretch along the pull, lift over their neighbours and wobble back" width="760"></a>
 
 <a href="https://github.com/54degree5/JellyGlass/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/54degree5/JellyGlass?style=for-the-badge&logo=github&color=8c66ff"></a> <a href="https://github.com/54degree5/JellyGlass/forks"><img alt="Forks" src="https://img.shields.io/github/forks/54degree5/JellyGlass?style=for-the-badge&logo=github&color=555"></a> <a href="https://github.com/54degree5/JellyGlass/commits/main"><img alt="Last commit" src="https://img.shields.io/github/last-commit/54degree5/JellyGlass?style=for-the-badge&color=2ea44f"></a> <a href="https://github.com/54degree5/JellyGlass/issues"><img alt="Open issues" src="https://img.shields.io/github/issues/54degree5/JellyGlass?style=for-the-badge&color=ffb84d"></a>
 
@@ -37,6 +37,10 @@ to get it working inside AppKit's glass containers (it is less obvious than it s
 
 The numbers are not guessed: they were measured, frame by frame, from a screen recording of a production app
 ([MEASUREMENTS.md](docs/MEASUREMENTS.md)).
+
+The animation above is the web version. The AppKit version runs the same physics on the system's own glass:
+
+<a href="docs/media/showreel.mp4"><img src="docs/media/showreel.gif" alt="The AppKit demo: system Liquid Glass buttons swell, stretch along the pull and wobble back" width="640"></a>
 
 ## Try it
 
@@ -70,6 +74,7 @@ let mic = JellyGlassButton(size: CGSize(width: 44, height: 44), symbols: ["mic"]
 mic.spring = .jelly            // .jelly (default) · .wobble · .snappy
 mic.stretch = .standard        // .standard · .wide · .heavy
 mic.liftsOnPress = true        // false: melt into neighbours instead
+mic.glass.style = .clear       // clearer, more transparent glass (the demo's default); .regular is darker
 
 // Optional: group buttons so neighbours share one glass surface and merge when `liftsOnPress` is false.
 let group = NSGlassEffectContainerView()

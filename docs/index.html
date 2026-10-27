@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>JellyGlass</title>
-<meta name="description" content="Liquid Glass that stretches like jelly under your cursor. Drag the buttons.">
+<meta name="description" content="Stretchy Liquid Glass (iOS style) for macOS and websites. Drag the buttons.">
 <link rel="canonical" href="https://54degree5.github.io/JellyGlass/">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="JellyGlass">
 <meta property="og:url" content="https://54degree5.github.io/JellyGlass/">
-<meta property="og:title" content="JellyGlass – Liquid Glass that stretches like jelly">
+<meta property="og:title" content="JellyGlass – Stretchy Liquid Glass (iOS style) for macOS and websites">
 <meta property="og:description" content="Press, drag, let go. Glass buttons that swell, stretch along the pull and wobble back. AppKit for macOS 26 + this web version.">
 <meta property="og:image" content="https://54degree5.github.io/JellyGlass/media/social.png">
 <meta property="og:image:width" content="1280">
@@ -121,6 +121,7 @@
   @keyframes ping { from { transform: scale(.35); opacity: .9; } to { transform: scale(1.7); opacity: 0; } }
   .seg button.demo { display: inline-flex; align-items: center; gap: 6px; }
   #hint { position: fixed; left: 0; right: 0; top: 48px; text-align: center; opacity: .55; pointer-events: none; transition: opacity .6s; }
+  html.rec #title, html.rec #controls, html.rec #hint { display: none; }                  /* #rec: clean frame for the README video */
   @media (prefers-reduced-motion: reduce) { .blob { animation: none; } }
 </style>
 </head>
@@ -424,7 +425,7 @@
     addEventListener('resize', resize); resize();
 
     const boxes = new Float32Array(20), scales = new Float32Array(10), press = new Float32Array(5), held = new Float32Array(5);
-    const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const still = matchMedia('(prefers-reduced-motion: reduce)').matches || /#rec/.test(location.hash);   // #rec: frozen scene, small seamless GIF
     function frame(now) {
       const ui = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ui')) || 1;
       const items = jellies.map(j => { const r = j.el.getBoundingClientRect(), m = j.shape;
@@ -476,11 +477,12 @@
     return { x: ax(a.x, b.x, c.x, d.x), y: ax(a.y, b.y, c.y, d.y) };
   }
 
-  const auto = { on: false, raf: 0, t0: 0, segs: [], held: null, idle: 0 };
-  function buildSegments() {
+  const auto = { on: false, raf: 0, t0: 0, segs: [], held: null, idle: 0, loop: 1, cx: 0, cy: 0 };
+  const startPoint = () => ({ x: innerWidth * .5, y: innerHeight * .72 });
+  function buildSegments(from) {                                  // `from`: where the cursor is now, so a new loop never jumps
     const ui = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ui')) || 1;
     const centre = j => { const r = j.el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; };
-    let t = 0.4, cur = { x: innerWidth * .5, y: innerHeight * .72 }; const segs = [];
+    let t = 0.4, cur = from || startPoint(); const segs = [];
     TAKES.forEach(([idx, pts, dur, swing], n) => {
       const j = jellies[idx], a = centre(j), dist = Math.hypot(a.x - cur.x, a.y - cur.y) / ui;
       const trav = Math.min(Math.max(.34 + dist / 700, .4), .95);
@@ -492,11 +494,15 @@
     return segs;
   }
   function releaseHeld() { if (auto.held) { auto.held.up(); auto.held = null; } cursorEl.classList.remove('down'); }
-  function place(x, y) { cursorEl.style.transform = `translate(${x}px, ${y}px)`; }
+  function place(x, y) { auto.cx = x; auto.cy = y; cursorEl.style.transform = `translate(${x}px, ${y}px)`; }
   function autoTick(now) {
     if (!auto.on) return;
     const t = (now - auto.t0) / 1000, segs = auto.segs, end = segs[segs.length - 1].t1;
-    if (t > end) { releaseHeld(); auto.t0 = now; auto.segs = buildSegments(); auto.raf = requestAnimationFrame(autoTick); return; }
+    if (t > end) {
+      releaseHeld(); auto.t0 = now; auto.segs = buildSegments({ x: auto.cx, y: auto.cy }); auto.loop++;
+      if (window.__onLoop) window.__onLoop(auto.loop);
+      auto.raf = requestAnimationFrame(autoTick); return;
+    }
     let s = segs[0]; for (const x of segs) if (x.t0 <= t) s = x;
     const k = Math.min(Math.max((t - s.t0) / (s.t1 - s.t0), 0), 1);
     if (s.kind === 'travel') {
@@ -517,6 +523,7 @@
   function startAuto() {
     if (auto.on) return;
     auto.on = true; cursorEl.style.display = 'block'; demoBtn.setAttribute('aria-pressed', 'true'); demoBtn.textContent = '■ stop';
+    auto.loop = 1; place(startPoint().x, startPoint().y);
     auto.segs = buildSegments(); auto.t0 = performance.now(); auto.raf = requestAnimationFrame(autoTick);
   }
   function stopAuto() {
@@ -533,7 +540,14 @@
     if (!e.isTrusted || e.target === demoBtn) return;
     stopAuto(); armIdle(12000);
   }, true);
-  armIdle(2400);
+  if (/#rec/.test(location.hash)) {   // recording mode (README video): no chrome, plays at once, a 6 px corner marker flips colour on every loop
+    document.documentElement.classList.add('rec');
+    const mark = document.createElement('div');
+    mark.style.cssText = 'position:fixed;left:0;top:0;width:6px;height:6px;z-index:999;background:#f00';
+    document.body.appendChild(mark);
+    window.__onLoop = n => { mark.style.background = n % 2 ? '#0f0' : '#00f'; };
+    setTimeout(() => { startAuto(); mark.style.background = '#0f0'; }, 1200);
+  } else armIdle(2400);
 
   // ---------- live star count (the repository must be public; hidden otherwise) ----------
   fetch('https://api.github.com/repos/54degree5/JellyGlass', { headers: { Accept: 'application/vnd.github+json' } })
