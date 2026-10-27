@@ -117,14 +117,20 @@ inputRefractionOpacity = 0     inputInnerRefractionAmount = -42, …Height = 15.
                                inputOuterRefractionAmount = 8.4,  …Height = 5.25   the lens at the rim
 ```
 
-Setting `BlurRadius = 0`, `FaceOpacity ≈ 0.15`, the fill alpha to 0, `RefractionOpacity = 1` and a stronger inner
-refraction gives glass you can see through: the grid behind it stays sharp and bends around the rim.
-
-Two traps:
+`BlurRadius = 0`, `FaceOpacity ≈ 0.15`, the fill alpha 0 and `RefractionOpacity = 1` give glass you can see through: the
+grid behind it stays sharp and bends around the rim. Traps, in the order they bit:
 
 - **Edit a copy.** Mutating the live filter object changes nothing on screen. Copy it (`filter.copy()`), set the inputs
   on the copy and assign `layer.filters = [copy]`.
-- **AppKit puts the original back** whenever it rebuilds the layers: on press, on release, on layout. Re-applying in
-  the button's `layout()` is not enough (it misses the rebuild after the spring settles). `JellyGlass` re-applies in a
-  run-loop observer that fires last, just before the thread sleeps, and flushes the transaction if it changed anything.
-  An idle app does no work.
+- **Do not fight AppKit afterwards.** It rewrites the filter on every frame while the glass moves, after any layout
+  hook, and a run-loop observer that patches it back runs after the commit. The result was the clear and the milky
+  filter alternating frame by frame: the whole row appeared to shake. What works is to give each backdrop layer a
+  dynamic subclass (`objc_allocateClassPair` + `object_setClass`, as KVO does) whose `setFilters:` clears the filter on
+  the way in. Nothing wrong ever reaches the screen. An observer still finds *new* layers, at the end of a run-loop
+  turn, so an idle app does no work.
+- **The pressed glass has a second body.** A lifted button adds a `CASDFLayer` with a `CASDFGradientEffect` (white) on
+  top, and resets its opacity to 1 every frame. Same remedy: a subclass whose `setOpacity:` caps it at 0.2.
+- **Black crescents at the rim.** With a stronger inner refraction (`-70`) the lens samples outside the backdrop's
+  rectangle, which ends exactly at the group's outer edges, and reads black there; the crescents also blinked.
+  `bleedAmount` and `marginWidth` on the backdrop layer (40) give it room, and AppKit's own refraction strength is kept.
+  `scale` (0.5) is raised to 1 so that the capture grid does not shimmer when one button moves.
