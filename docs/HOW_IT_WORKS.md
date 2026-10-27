@@ -134,3 +134,43 @@ grid behind it stays sharp and bends around the rim. Traps, in the order they bi
   rectangle, which ends exactly at the group's outer edges, and reads black there; the crescents also blinked.
   `bleedAmount` and `marginWidth` on the backdrop layer (40) give it room, and AppKit's own refraction strength is kept.
   `scale` (0.5) is raised to 1 so that the capture grid does not shimmer when one button moves.
+
+## 10. The lens, measured
+
+The rim of the system glass bends what is behind it in a way that is easy to see and hard to guess. The web version
+does not guess it; it copies a profile measured from the real thing.
+
+**How it was measured.** A `NSGlassEffectView` is laid over a backdrop in which the colour encodes the screen
+coordinate: R and G are `cos` and `sin` of `2π·x/160`, B is a coarse ramp that resolves the 160 pt ambiguity. The
+backdrop must be drawn in the screen's colour space (`window.screen.colorSpace`), otherwise the display profile bends the
+phase. The window sits at desktop level, is ordered back and never activated, and `screencapture -l <window id>` takes
+the picture. Decoding the phase of each pixel gives the coordinate it shows, so `shown − actual` is the displacement
+at every point, to about 0.03 pt. The same is done along y.
+
+**What it found.** A point at depth `d` inside the rim shows what lies `A · F(d / H)` further inside, along the normal:
+
+```
+A = min(shorter side, 60)          H = min(0.36 × shorter side, 20)         (points)
+
+t     0     .05   .10   .15   .20   .25   .30   .35   .40   .45   .50
+F   .840  .674  .562  .4645 .392  .328  .2751 .2282 .1877 .1517 .1203
+t    .55   .60   .65   .70   .75   .80   .85   .90   .95   1.0
+F   .0935 .0690 .0463 .0296 .0142 .0040  0     0     0     0
+```
+
+- The outer two thirds of the band show the inside of the glass **upside down**: the very edge looks up to 50 pt deeper,
+  and the further in, the less. Then there is a short magnifying zone. Past `0.85 · H` the glass is 1:1.
+- The direction is the outward normal of the same shape with its corners rounded 1.5× more
+  (`R' = min(1.5 · R, half-size)`). For a capsule that is the same normal; for a rounded rectangle the lens pulls
+  diagonally at the corners. The corner radius itself does not change the strength.
+- The model reproduces the measurement to 0.1–1 pt.
+
+**In the shader.** `LENS[21]` holds `F` in steps of 0.05 and `lensF(t)` interpolates it; the fragment samples the scene
+at `p − n · A · lensF(din / H)`. The web version uses the shape's own normal. Dispersion is kept to ±1.5 % of the
+displacement so white stays white, and the highlight is a thin contour (about one pixel wide, tinted by what lies under
+it) instead of a broad specular band, as on the system glass.
+
+**Trap: an inactive window blurs eight times more.** The same glass in a window that is not key is a different material:
+the blur is `σ ≈ 1.75 · BlurRadius` (up to 17 pt) and the fill is milky. What a user sees is the active look
+(`BlurRadius` 1, `σ` about 2 pt in the middle and half that at the rim). To measure that, the probe window must be a
+`NSWindow` subclass that returns `true` from `isKeyWindow` and `_hasActiveAppearance`.

@@ -308,8 +308,8 @@
   /* ------------------------------------------------------------------------------------------------
      Real Liquid Glass. The scene behind the buttons (colour blobs + grid) is a function, so one WebGL2 fragment
      shader draws it and, inside each button's capsule, draws it again *through* the glass: the sample point is bent
-     by the slope of a rounded glass edge (refraction), split per colour channel (dispersion), slightly magnified,
-     lightly blurred, then lit with a fresnel rim and a specular glint. Works in every browser with WebGL2; without it
+     along the edge normal by a profile measured from the macOS 26 system glass (refraction), split a hair per colour
+     channel (dispersion), lightly blurred, then outlined by a thin bright contour. Works in every browser with WebGL2; without it
      the CSS glass above stays. Each capsule follows its button's jelly motion every frame.
   ------------------------------------------------------------------------------------------------ */
   (() => {
@@ -419,6 +419,17 @@
       }
       float sdist(vec2 p, vec4 b, vec2 s, float type) { float d; vec2 n; shape(p, b, s, type, d, n); return d; }
 
+      // The lens of the macOS 26 system glass, measured on screen with a coordinate-coded backdrop (27.10): a point at
+      // depth din from the rim shows what lies A·F(din/H) further inside, along the normal. A = shorter side, at most 60;
+      // H = 0.36 × shorter side, at most 20 (px = pt). F drops fast over the outer two thirds of the band, so that part
+      // shows the inside of the glass upside down; then it magnifies; past 0.85·H the glass is 1:1.
+      const float LENS[21] = float[21](.840, .674, .562, .4645, .392, .328, .2751, .2282, .1877, .1517, .1203,
+                                       .0935, .0690, .0463, .0296, .0142, .0040, 0., 0., 0., 0.);
+      float lensF(float t) {
+        float x = clamp(t, 0.0, 1.0) * 20.0; int i = min(int(x), 19);
+        return mix(LENS[i], LENS[i + 1], x - float(i));
+      }
+
       vec3 blurScene(vec2 p, float r) {
         return (scene(p) * 2.0 + scene(p + vec2(r, 0.)) + scene(p - vec2(r, 0.)) + scene(p + vec2(0., r)) + scene(p - vec2(0., r))) / 6.0;
       }
@@ -443,29 +454,32 @@
           if (d > 1.0) continue;
           float cover = clamp(0.5 - d, 0.0, 1.0);
           float din = max(-d, 0.0);
-          float bezel = min(b.z * sc.x, b.w * sc.y) * 0.55;        // how thick the curved edge is
-          float t = clamp(din / bezel, 0.0, 1.0);
+          float side = 2.0 * min(b.z * sc.x, b.w * sc.y);
+          float amount = min(side, 60.0), band = min(0.36 * side, 20.0);
+          float t = clamp(din / band, 0.0, 1.0);
           float edge = pow(1.0 - t, 2.2);                          // 1 at the rim, 0 in the flat middle
 
-          float push = 12.5 * edge;                                // px of bend at the rim
-          vec2 mag = (p - b.xy) * 0.04 * (1.0 - edge);             // gentle magnification of the middle
-          vec2 sp = p - mag - n * push;                            // sample from further inside: a convex lens
+          float push = amount * lensF(t);                          // px: how far inside the rim looks
+          vec2 sp = p - n * push;
 
-          vec3 refr;
-          refr.r = blurScene(p - mag - n * push * 1.10, 1.1).r;
+          vec3 refr;                                               // barely any colour fringing: white stays white
+          refr.r = blurScene(p - n * push * 1.015, 1.1).r;
           refr.g = blurScene(sp, 1.1).g;
-          refr.b = blurScene(p - mag - n * push * 0.90, 1.1).b;
+          refr.b = blurScene(p - n * push * 0.985, 1.1).b;
 
+          // The highlight like the system glass on macOS: not a broad white band but a thin bright contour along the
+          // edge, tinted by what lies under it.
+          vec3 bg = blurScene(p + n * 3.0, 3.0);
+          float luma = dot(bg, vec3(.299, .587, .114));
+          vec3 tc = clamp(mix(vec3(luma), bg, 1.7) * 2.0 + .16, 0.0, 1.0);
           vec2 L = normalize(vec2(-.62, -.78));                    // light from the top left
           float lit = max(dot(n, L), 0.0), back = max(dot(n, -L), 0.0);
-          float rim = pow(1.0 - t, 3.0);
-          float spec = (pow(lit, 2.2) * .34 + pow(back, 2.2) * .14) * rim;
-          float fres = pow(1.0 - t, 4.0) * .10;
+          float line = exp(-din / 0.85) * (.55 + .30 * lit + .15 * back);
           float press = uPress[i];
 
           vec3 g = refr * (1.04 + .05 * (1.0 - edge));
           g = mix(g, vec3(1.0), .025 + .10 * press);               // faint milkiness, lighter when pressed
-          g += vec3(spec + fres);
+          g = mix(g, tc, clamp(line, 0.0, 1.0));
           g -= vec3(.05) * smoothstep(.0, 1.0, (p.y - b.y) / (b.w * sc.y)) * (1.0 - edge); // a hint of depth toward the bottom
           col = mix(col, g, cover);
         }

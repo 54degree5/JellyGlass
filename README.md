@@ -49,7 +49,8 @@ to get it working inside AppKit's glass containers (it is less obvious than it s
   the container's glass group.
 
 The numbers are not guessed: they were measured, frame by frame, from a screen recording of a production app
-([MEASUREMENTS.md](docs/MEASUREMENTS.md)).
+([MEASUREMENTS.md](docs/MEASUREMENTS.md)). So was the lens of the system glass that the web version copies
+([HOW_IT_WORKS.md §10](docs/HOW_IT_WORKS.md#10-the-lens-measured)).
 
 ## Try it
 
@@ -147,10 +148,12 @@ Full write-up with the layer tree and the dead ends: [docs/HOW_IT_WORKS.md](docs
 pressing the buttons and wandering with them (press anything to take over; **▶ demo** brings it back).
 
 The glass is real, not a CSS imitation: a WebGL2 fragment shader draws the scene behind the buttons and draws it again
-*through* each button's capsule — the sample point is bent by the slope of a rounded glass edge (refraction), split per
-colour channel (dispersion), slightly magnified in the middle, lightly blurred, then lit with a fresnel rim and a faint
-specular glint. Each capsule follows its button's jelly motion every frame, so the refraction stretches and wobbles with
-it (120 fps on a retina MacBook). The physics is the same as the AppKit version: same formulas, same springs.
+*through* each button's capsule. Near the rim the sample point is moved along the edge normal by a profile **measured
+from the real macOS 26 glass** (the outer rim shows the inside of the glass flipped, then comes a short magnified band,
+then the glass is 1:1), with a hair of dispersion, a light blur and a thin bright contour that picks up the colour under
+it ([how it was measured](docs/HOW_IT_WORKS.md#10-the-lens-measured)). Each capsule follows its button's jelly motion every frame, so the
+refraction stretches and wobbles with it (120 fps on a retina MacBook). The physics is the same as the AppKit version:
+same formulas, same springs.
 
 **Any shape, any length:** [`docs/shapes.html`](https://54degree5.github.io/JellyGlass/shapes.html) runs the same physics on a circle, a
 pill, a 560 px bar, a squircle, a star, a heart, a hexagon, a triangle, a plus sign and a wobbly blob. A shape is just a
