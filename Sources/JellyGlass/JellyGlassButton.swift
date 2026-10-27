@@ -79,6 +79,14 @@ public final class JellyGlassButton: NSView {
     /// White tint at full press; the glass lightens instead of darkening. 0 disables it.
     public var pressTintAlpha: CGFloat = 0.16
 
+    /// `.transparent` (default): clear, refractive glass that shows what is behind it. `.system`: AppKit's frosted material.
+    public var look: GlassLook = .transparent {
+        didSet {
+            if look == .transparent { glass.style = .clear }
+            render()
+        }
+    }
+
     /// The underlying glass view, e.g. to change `style` or `tintColor`.
     public let glass = NSGlassEffectView()
     /// Size of the resting button.
@@ -149,6 +157,7 @@ public final class JellyGlassButton: NSView {
         contentView.frame = NSRect(x: margin, y: margin, width: size.width, height: size.height)
         content.addSubview(contentView)
         glass.contentView = content
+        glass.style = .clear
         addSubview(glass)
         render()
     }
@@ -219,9 +228,11 @@ public final class JellyGlassButton: NSView {
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         glass.setPrivatePath(capsule.copy(using: &map))
-        glass.tintColor = pressLevel > 0.002 ? NSColor(white: 1, alpha: pressTintAlpha * pressLevel) : nil
+        let tint = look == .transparent ? pressTintAlpha * 0.3 : pressTintAlpha      // clear glass stays clear when pressed
+        glass.tintColor = pressLevel > 0.002 ? NSColor(white: 1, alpha: tint * pressLevel) : nil
         // the container only re-reads silhouettes during its layout pass
         glass.needsLayout = true
+        needsLayout = true                 // our own layout() runs after the container's and re-applies the look
         var ancestor: NSView? = superview
         while let view = ancestor {
             view.needsLayout = true
@@ -240,6 +251,37 @@ public final class JellyGlassButton: NSView {
             .concatenating(CGAffineTransform(translationX: -anchor.x, y: -anchor.y))
         layer.transform = CATransform3DMakeAffineTransform(relative)
         CATransaction.commit()
+    }
+
+    // MARK: Look
+
+    @discardableResult
+    func applyLook(seen: inout Set<ObjectIdentifier>) -> Bool {
+        guard look == .transparent else { return false }
+        var root: NSView = glass
+        var ancestor: NSView? = superview
+        while let view = ancestor {
+            if view is NSGlassEffectContainerView { root = view; break }
+            ancestor = view.superview
+        }
+        guard let layer = root.layer, seen.insert(ObjectIdentifier(layer)).inserted else { return false }
+        return GlassTuner.applyClear(under: layer)
+    }
+
+    private func applyLook() {
+        var seen = Set<ObjectIdentifier>()
+        applyLook(seen: &seen)
+    }
+
+    public override func layout() {
+        super.layout()
+        applyLook()
+    }
+
+    public override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        guard window != nil else { return }
+        GlassLookKeeper.shared.add(self)
     }
 
     // MARK: Spring

@@ -13,7 +13,7 @@ import JellyGlass
 //   --pull TARGET DX DY            hold a pull; TARGET = attach|pill|mic|pin|search
 //   --ready-file PATH [--ready-after SECONDS]   write the window number there when the scene is ready
 //   --stage-file PATH              write the rectangle around all buttons (screen points, top-left origin) as "x y w h"
-//   --merge   --style regular   --spring N   --stretch N
+//   --merge   --look system   --style regular   --spring N   --stretch N   --dump (print the glass layer tree)
 
 final class RootView: NSView {
     let backdrop = BackdropView()
@@ -106,7 +106,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let bar = root.bar, header = root.header
         if args.contains("--merge") { root.allButtons.forEach { $0.liftsOnPress = false } }
-        if value("--style") != "regular" { root.allButtons.forEach { $0.glass.style = .clear } }     // clear glass by default
+        if value("--look") == "system" { root.allButtons.forEach { $0.look = .system } }
+        if value("--style") == "regular" { root.allButtons.forEach { $0.glass.style = .regular } }
+        else if value("--look") == "system" { root.allButtons.forEach { $0.glass.style = .clear } }
         if let n = value("--spring").flatMap({ Int($0) }) {
             root.allButtons.forEach { $0.spring = JellyGlassButton.Spring.allCases[n % JellyGlassButton.Spring.allCases.count] }
         }
@@ -170,6 +172,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { button.pull(to: CGVector(dx: dx, dy: dy)) }
             if args.contains("--release") {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.9) { button.release() }
+            }
+        }
+
+        if args.contains("--dump") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [self] in
+                LayerDump.run(window: window)
+                exit(0)
             }
         }
 

@@ -103,3 +103,28 @@ dump(window.contentView!.superview!.layer!)
 
 Private properties can be read through KVC, e.g. `layer.value(forKey: "smoothness")` on a `CASDFLayer`,
 `layer.value(forKey: "sourceLayer")` on a `CAPortalLayer`.
+
+## 9. Making the glass clear: the `glassBackground` filter
+
+System glass, even `style = .clear`, looks milky: whatever is behind it is blurred and washed with white. The reason is a
+private `CAFilter` named `glassBackground` on the `CABackdropLayer` that the container builds for each glass group
+(dump the tree and print `layer.filters`; each filter lists its `inputKeys`). On macOS 26 it has, among others:
+
+```
+inputBlurRadius = 1            inputBlurOpacity0…4, inputBlurDistance0…4   frost, by distance from the edge
+inputFaceOpacity = 1           inputFaceColorMatrixFillColor = white α 0.31  the milky body
+inputRefractionOpacity = 0     inputInnerRefractionAmount = -42, …Height = 15.12
+                               inputOuterRefractionAmount = 8.4,  …Height = 5.25   the lens at the rim
+```
+
+Setting `BlurRadius = 0`, `FaceOpacity ≈ 0.15`, the fill alpha to 0, `RefractionOpacity = 1` and a stronger inner
+refraction gives glass you can see through: the grid behind it stays sharp and bends around the rim.
+
+Two traps:
+
+- **Edit a copy.** Mutating the live filter object changes nothing on screen. Copy it (`filter.copy()`), set the inputs
+  on the copy and assign `layer.filters = [copy]`.
+- **AppKit puts the original back** whenever it rebuilds the layers: on press, on release, on layout. Re-applying in
+  the button's `layout()` is not enough (it misses the rebuild after the spring settles). `JellyGlass` re-applies in a
+  run-loop observer that fires last, just before the thread sleeps, and flushes the transaction if it changed anything.
+  An idle app does no work.

@@ -74,7 +74,7 @@ let mic = JellyGlassButton(size: CGSize(width: 44, height: 44), symbols: ["mic"]
 mic.spring = .jelly            // .jelly (default) · .wobble · .snappy
 mic.stretch = .standard        // .standard · .wide · .heavy
 mic.liftsOnPress = true        // false: melt into neighbours instead
-mic.glass.style = .clear       // clearer, more transparent glass (the demo's default); .regular is darker
+mic.look = .transparent        // default: clear refractive glass, the scene behind stays visible; .system = AppKit's frosted material
 
 // Optional: group buttons so neighbours share one glass surface and merge when `liftsOnPress` is false.
 let group = NSGlassEffectContainerView()
@@ -155,7 +155,7 @@ page content needs a page capture or Chromium's SVG `backdrop-filter`; contribut
 ## Caveats
 
 - **Private API.** `_setPath:` and `_interactionState` are private AppKit selectors, resolved at runtime
-  (they exist on macOS 26). Fine for tools and experiments, not for the App Store. If a selector goes missing
+  (they exist on macOS 26), and the clear look edits the inputs of the private `glassBackground` backdrop filter. Fine for tools and experiments, not for the App Store. If a selector goes missing
   the call is skipped and the button degrades to icon animation only.
 - **macOS 26+** (Tahoe). Earlier systems have no `NSGlassEffectView`.
 - The model was measured from one recording of one button. It matches that recording closely; other buttons
